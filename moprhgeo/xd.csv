@@ -1,0 +1,13 @@
+Subject,Predicate,Object
+https://api-features.idee.es//railwaystationnode/items/FCEST_N150300000133,http://www.ogc.org/nombre,Estación de A Coruña                                                                                
+https://api-features.idee.es//railwaystationnode/items/FCEST_N150300000133,http://www.ogc.org/nilreason_nombre,
+https://api-features.idee.es//railwaystationnode/items/FCEST_N150300000133,http://www.ogc.org/id_estfc,150300000133
+https://api-features.idee.es//railwaystationnode/items/FCEST_N150300000133,http://www.ogc.org/nil_varios,True
+https://api-features.idee.es//railwaystationnode/items/FCEST_N150300000133,http://www.ogc.org/formofnode,http://inspire.ec.europa.eu/codelist/FormOfRailwayNodeValue/railwayStop
+https://api-features.idee.es//railwaystationnode/items/FCEST_N150300000133,http://www.ogc.org/nilreason_n_andenes,unknown
+https://api-features.idee.es//railwaystationnode/items/FCEST_N150300000133,http://www.ogc.org/nil_nombre,
+https://api-features.idee.es//railwaystationnode/items/FCEST_N150300000133,http://www.ogc.org/fecha_alta,2018-02-18T00:00:00
+https://api-features.idee.es//railwaystationnode/items/FCEST_N150300000133,http://www.ogc.org/n_andenes,
+https://api-features.idee.es//railwaystationnode/items/FCEST_N150300000133,http://www.ogc.org/nil_n_andenes,True
+https://api-features.idee.es//railwaystationnode/items/FCEST_N150300000133,http://www.opengis.net/ont/geosparql#hasGeometry,"{'type': 'Point', 'coordinates': [-8.40950764982851, 43.35286721390232, 31.752999999996973]}"
+https://api-features.idee.es//railwaystationnode/items/FCEST_N150300000133,http://www.ogc.org/nilreason_varios,other:unpopulated

@@ -1,0 +1,32 @@
+@prefix geo: <http://www.opengis.net/ont/geosparql#> .
+@prefix htv: <http://www.w3.org/2011/http#> .
+@prefix ogc: <http://www.ogc.org/> .
+@prefix rml: <http://w3id.org/rml/> .
+@prefix void: <http://rdfs.org/ns/void#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+ogc:FuenteAPI_railwaystationnode htv:absoluteURI "https://api-features.idee.es/collections/railwaystationnode/items" .
+
+ogc:railwaystationnodeTriplesMap a rml:TriplesMap ;
+    rml:logicalSource ogc:LogicalSource_railwaystationnode ;
+    rml:predicateObjectMap [ rml:objectMap [ rml:datatype geo:geoJSONLiteral ;
+                    rml:reference "geometry" ] ;
+            rml:predicate geo:hasGeometry ],
+        [ rml:objectMap [ rml:datatype xsd:integer ;
+                    rml:reference "properties.n_andenes" ; void:filterx "n_andenes=@{1}" ; void:projectx "properties=n_andenes" ] ;
+            rml:predicate ogc:n_andenes ],
+        [ rml:objectMap [ rml:datatype xsd:string ;
+                    rml:reference "properties.nombre"; void:filterx "nombre=@{1}" ; void:projectx "properties=nombre" ] ;
+            rml:predicate ogc:nombre ],
+        [ rml:objectMap [ rml:datatype xsd:string ;
+                    rml:reference "id" ] ;
+            rml:predicate ogc:id ; void:filterx "/@/" ] ;
+    rml:subjectMap [ rml:class ogc:railwaystationnode ;
+            rml:template "https://api-features.idee.es/collections/railwaystationnode/items/{id}" ] .
+
+ogc:LogicalSource_railwaystationnode a rml:logicalSource ;
+    rml:iterator "$.features.*" ;
+    void:nextPage "$.links[?(@.rel==\"next\")].href" ;
+    rml:referenceFormulation rml:HTTPAPI ;
+    rml:source ogc:FuenteAPI_railwaystationnode .
+
