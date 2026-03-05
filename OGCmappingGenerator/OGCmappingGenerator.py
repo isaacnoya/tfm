@@ -174,7 +174,7 @@ def generate_mapping(collection, output_mappings_folder, urlBase):
     g_mappings.add((triples_map, RDF.type, RML.TriplesMap))
 
     g_mappings.add((triples_map, RML.logicalSource, OGC["LogicalSource_" + collection.id]))
-    add_subject_map(triples_map, OGC[collection.id], g_mappings, template=ogc_api_url+f"/{collection.id}" + "/items/{id}")
+    add_subject_map(triples_map, OGC[collection.id], g_mappings, template=ogc_api_url+f"/collections/{collection.id}" + "/items/{id}")
 
     for prop in collection.properties: 
         add_pom_ref(triples_map, OGC[prop["title"]], f"properties.{prop['title']}", g_mappings, datatype=XSD[prop["type"]], filter=f"{prop['title']}"+"=@{1}") if prop["type"]!="number" else add_pom_ref(triples_map, OGC[prop["title"]], f"properties.{prop['title']}", g_mappings, datatype=XSD["float"], filter=f"{prop['title']}"+"=@{1}")

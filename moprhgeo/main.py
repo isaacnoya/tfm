@@ -27,8 +27,6 @@ def getMappings(mapping_file):
     mappings = rdflib.Graph()
     mappings = rdf_class_to_pom(mappings.parse(mapping_file, format="turtle"))
 
-    mappings.serialize(destination="mapping_rules.ttl", format="turtle")
-
     # select all mapping rules with the form (url, iterator, subject, predicate, object)
     mappingRuleQuery = prepareQuery("""
     PREFIX rml: <http://w3id.org/rml/>
@@ -70,6 +68,8 @@ def candidateMappingSelection(subquery: list[TriplePattern], mappings: list[Virt
     mappings = [copy.copy(m) for m in mappings]
     for tp in subquery:
         compatible_mappings = get_compatible_mappings(tp, mappings)
+        if len(compatible_mappings) == 0:  #All the tp in the subquery should have min 1 compatible mapping, otherwise, de conjuctive query shall not be satisfacible
+            return []
         for m in compatible_mappings:
             params = {}
             if isinstance(tp.o, Literal) and m.filterx is not None:
@@ -79,7 +79,7 @@ def candidateMappingSelection(subquery: list[TriplePattern], mappings: list[Virt
             if m.projectx is not None and False:
                 key, value = m.projectx.split('=')
                 params = params | {key: value}
-            elif isinstance(tp.o, Variable) and m.filterx is not None and False:
+            elif isinstance(tp.o, Variable) and m.filterx is not None and False: # Aqui se deberia de usar el property select creo.
                 params = m.filterx.replace("@{1}", f"var({str(tp.o)})")
                 key, value = params.split('=')
                 payload = {key: value}
@@ -112,12 +112,15 @@ def materializeVirtualMappingGroup(vms : list[VirtualMapping], bindings):
             r_subj = [re.sub(r"\{.*?\}", str(valor), mappings[0].s) for valor in r_subj]
 
             for m in mappings: 
-                r_obj = JSONPath(m.o).parse(r)
+                if isinstance(m.o, Reference):
+                    r_obj = JSONPath(m.o).parse(r) 
 
-                tripletas = [
-                (sujeto, m.p, objeto) 
-                for sujeto, objeto in zip(r_subj, r_obj)
-                ]
+                    tripletas = [
+                    (sujeto, m.p, objeto) 
+                    for sujeto, objeto in zip(r_subj, r_obj)
+                    ]
+                else: # Object is a constant URI, not a Reference   
+                    tripletas = [(sujeto, m.p, m.o) for sujeto in r_subj]
 
                 triples_acc.extend(tripletas)
 
@@ -129,21 +132,24 @@ sparql_query = """
 PREFIX geo: <http://www.opengis.net/ont/geosparql#> 
 PREFIX ogc: <http://www.ogc.org/> 
 SELECT ?x ?y WHERE {
-    ?x a ogc:railwaystationnode . 
-    ?y a ogc:railwaystationnode . 
+    ?x a ogc:railwaystationnode .
     ?x ogc:nombre "Estación de A Coruña" .
-    ?y ogc:nombre "Estación de Casal" .
-    ?x ?p ?o .
+    ?y a <http://www.ogc.org/agua:estado_masas_aguasub> .
 } 
 """
 
-sparql_query = """
+"""
+
+https://wmts.mapama.gob.es/sig-api/ogc/features/v1/collections/agua:masas_aguasub_2027/items?f=json&filter=s_contains(shape,%20POINT(-2.514604067437437%2042.84881824371775))
+"""
+
+sparql_queryx = """
 PREFIX geo: <http://www.opengis.net/ont/geosparql#> 
 PREFIX ogc: <http://www.ogc.org/> 
 SELECT ?x WHERE {
     ?x a ogc:railwaystationnode . 
     ?x ogc:nombre "Estación de A Coruña" .
-    ?x ?p ?y .
+    ?x geo:hasGeometry ?geom .
 } 
 """
 
@@ -158,7 +164,11 @@ for t in algebra.p.p.triples:
     tps.append(tc)
 
 subqueries = getStarShapedSubqueries(tps)
+
 mappings = getMappings("/Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/idee-features/mappings/railwaystationnode_mapping.ttl")
+mappings2 = getMappings("/Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/mapama-features/mappings/agua:estado_masas_aguasub_mapping.ttl")
+
+mappings.extend(mappings2)
 
 lista_it = []
 bindings = []
