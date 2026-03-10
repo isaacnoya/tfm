@@ -7,15 +7,19 @@ class Reference(rdflib.term.Literal):
             super().__init__()    
 
 class VirtualMapping:
-    def __init__(self, subject=None, predicate=None, object=None, reference=None, source=None, iterator=None, nextPage=None, filterx=None, projectx=None):
+
+    def __init__(self, subject=None, predicate=None, objec=None, reference=None, source=None, iterator=None, nextPage=None, filterx=None, projectx=None):
         if subject != None:
-            self.s = self.saturateLiteral(subject, iterator) if isinstance(subject, rdflib.term.Literal) and iterator!=None else subject
+            self.s = Reference(self.saturateLiteral(subject, iterator).toPython()) if isinstance(subject, rdflib.term.Literal) and iterator!=None else subject
         if predicate != None:
             self.p = self.saturateLiteral(predicate, iterator) if isinstance(predicate, rdflib.term.Literal) and iterator!=None else predicate
-        if object != None and reference == None:
-            self.o = object
-        elif reference != None and object == None:
+        if objec != None and reference == None:
+            self.o = objec
+        elif reference != None and objec == None:
             self.o = Reference(self.saturateLiteral(reference, iterator).toPython()) if iterator!=None else reference
+        else:
+            # TODO
+            self.o = rdflib.term.Literal("Aqui habria un triplesMap join")
         if source != None:
             self.source = source
         
