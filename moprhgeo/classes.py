@@ -1,6 +1,17 @@
 import rdflib
 import re
 
+RML_NAMESPACE = 'http://w3id.org/rml/'
+RML_SUBJECT_MAP = f'{RML_NAMESPACE}subjectMap'
+RML_PREDICATE_MAP = f'{RML_NAMESPACE}predicateMap'
+RML_OBJECT_MAP = f'{RML_NAMESPACE}objectMap'
+RML_SUBJECT_SHORTCUT = f'{RML_NAMESPACE}subject'
+RML_PREDICATE_SHORTCUT = f'{RML_NAMESPACE}predicate'
+RML_OBJECT_SHORTCUT = f'{RML_NAMESPACE}object'
+RML_PREDICATE_OBJECT_MAP = f'{RML_NAMESPACE}predicateObjectMap'
+RML_CLASS = f'{RML_NAMESPACE}class'
+
+
 class Reference(rdflib.term.Literal):
     def __init__(self, value, *args, **kwargs):
             # Opcional: puedes añadir lógica específica aquí
