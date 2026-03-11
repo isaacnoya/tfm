@@ -7,6 +7,8 @@ import rdflib
 import requests
 from rdflib import Graph, URIRef, BNode, Literal, Namespace, Variable
 import pandas as pd
+from rdflib.plugins.sparql.sparql import FrozenBindings, QueryContext
+
 
 from pathlib import Path
 from jsonpath import JSONPath
@@ -36,11 +38,54 @@ def candidateMappingSelection(subquery: list[TriplePattern], mappings: list[Virt
 
             req = requests.Request('GET', m.source, params=params).prepare()
             m.source=req.url   
+            m.setBindingVariables(tp.s, tp.p, tp.o)
             r.append(m) if m not in r else None
     return r
 
+def materializeVirtualMappingGroupCTX(vms : list[VirtualMapping], ctx: QueryContext):
+    vms_groups = getVirtualMappingsGroups(vms)
+    for url, mappings in vms_groups.items():
+        url_next = url
+        while url_next:
+            try:
+                r = requests.get(url_next, params={"f": "json", "limit": "2000"}).json()
+                #print(url_next)
+            except:
+                r = {} 
+            #Podemos usar mappings[0] porque todos los mappings comparten sujeto?
+            next = JSONPath(mappings[0].nextPage).parse(r) if mappings[0].nextPage != None else []
 
-def materializeVirtualMappingGroup(vms : list[VirtualMapping], bindings):
+            url_next = next[0] if len(next) else False
+            
+            if isinstance(mappings[0].s, Reference):
+                template = mappings[0].s
+                refs = re.findall(r"\{(.*?)\}", template)
+                values_per_ref = [JSONPath(ref).parse(r) for ref in refs]
+                r_subj = []
+                for vals in zip(*values_per_ref):  # empareja 1 a 1
+                    result = template
+                    for ref, val in zip(refs, vals):
+                        result = result.replace(f"{{{ref}}}", str(val))
+                    r_subj.append(result)
+            else:
+                r_subj=mappings[0].s
+
+            for m in mappings: 
+                if isinstance(m.o, Reference):
+                    r_obj = JSONPath(m.o).parse(r) 
+                    r_subj = [mappings[0].s for _ in r_obj] if isinstance(mappings[0].s, URIRef) else r_subj # In case subject is a constant, r_subj and r_obj must be same size in order to zip correctly
+
+                    for sujeto, objeto in zip(r_subj, r_obj):
+                        ctx.graph.add((URIRef(sujeto), URIRef(m.p), Literal(objeto)))
+                elif isinstance(m.o, URIRef): # Object is a constant URI, not a Reference
+                    if isinstance(mappings[0].s, Reference):
+                        for sujeto in r_subj:
+                            ctx.graph.add((URIRef(sujeto), URIRef(m.p), URIRef(m.o)))
+                    else: 
+                        ctx.graph.add((URIRef(r_subj), URIRef(m.p), URIRef(m.o)))
+    return ctx
+
+def materializeVirtualMappingGroup(vms : list[VirtualMapping], bindings: list[dict], tps: list[TriplePattern]):
     triples_acc = []
     vms_groups = getVirtualMappingsGroups(vms)
     for url, mappings in vms_groups.items():
@@ -48,7 +93,7 @@ def materializeVirtualMappingGroup(vms : list[VirtualMapping], bindings):
         while url_next:
             try:
                 r = requests.get(url_next, params={"f": "json", "limit": "2000"}).json()
-                print(url_next)
+                #print(url_next)
             except:
                 return pd.DataFrame([], columns=['Subject', 'Predicate', 'Object']), bindings
             #Podemos usar mappings[0] porque todos los mappings comparten sujeto?

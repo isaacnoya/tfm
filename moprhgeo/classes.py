@@ -14,11 +14,9 @@ RML_CLASS = f'{RML_NAMESPACE}class'
 
 class Reference(rdflib.term.Literal):
     def __init__(self, value, *args, **kwargs):
-            # Opcional: puedes añadir lógica específica aquí
             super().__init__()    
 
 class VirtualMapping:
-
     def __init__(self, subject=None, predicate=None, objec=None, reference=None, source=None, iterator=None, nextPage=None, filterx=None, projectx=None):
         if subject != None:
             self.s = Reference(self.saturateLiteral(subject, iterator).toPython()) if isinstance(subject, rdflib.term.Literal) and iterator!=None else subject
@@ -37,6 +35,12 @@ class VirtualMapping:
         self.nextPage = nextPage
         self.filterx = filterx
         self.projectx = projectx
+    
+    def setBindingVariables(self, bs, bp, bo):
+        bs = bs if isinstance(bs, rdflib.term.Variable) else None
+        bp = bp if isinstance(bs, rdflib.term.Variable) else None
+        bo = bo if isinstance(bs, rdflib.term.Variable) else None
+        self.bindingVariables = (bs, bp, bo)
 
     def saturateLiteral(self, literal, iterator):
         """

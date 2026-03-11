@@ -10,12 +10,13 @@ from mappings import getMappingsFromTxT
 
 """
 ---- NOTAS ----
-Mirarse https://github.com/RDFLib/rdflib-hdt/blob/master/rdflib_hdt/sparql_op.py
+Funciona pero el nombre de los literales tiene que cuadrar 100%
 
 Falta tratar bien los parentTriple joins
 Falta meter ahora los bindings
 
 se deberia de meter el project siempre (el properties=) ??
+
 """
 
 
@@ -25,7 +26,6 @@ PREFIX ogc: <http://www.ogc.org/>
 SELECT ?x ?y WHERE {
     ?x a ogc:railwaystationnode .
     ?x ogc:nombre "Estación de A Coruña" .
-    ?y a <http://www.ogc.org/agua:estado_masas_aguasub> .
 } 
 """
 
@@ -38,10 +38,11 @@ PREFIX geo: <http://www.opengis.net/ont/geosparql#>
 PREFIX ogc: <http://www.ogc.org/> 
 PREFIX sdmx-measure: <http://purl.org/linked-data/sdmx/2009/measure#>
 PREFIX qb: <http://purl.org/linked-data/cube#> 
+PREFIX ine: <https://stats.linkeddata.es/voc/cubes/obs/>
 SELECT ?x ?z WHERE {
     ?x a ogc:railwaystationnode . 
-    ?x ogc:nombre "Estación de A Coruña" .
-    ?s a qb:DataSet .
+    ?x ogc:nombre "Estación de A Coruña                                                                                " .
+    ine:1.6_200301 sdmx-measure:obsValue ?o  .
 } 
 """
 
@@ -65,7 +66,7 @@ bindings = []
 
 for suj, tps in subqueries.items():
     mappings_for_subq = candidateMappingSelection(tps, mappings)
-    l, bindings = materializeVirtualMappingGroup(mappings_for_subq, bindings)
+    l, bindings = materializeVirtualMappingGroup(mappings_for_subq, bindings, tps)
     lista_it.append(l)
 
 df_final = pd.concat(lista_it, ignore_index=True)
