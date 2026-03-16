@@ -13,6 +13,7 @@ from rdflib.plugins.sparql.sparql import FrozenBindings, QueryContext
 from pathlib import Path
 from jsonpath import JSONPath
 from io import StringIO
+from typing import Generator
 
 def candidateMappingSelection(subquery: list[TriplePattern], mappings: list[VirtualMapping]):
     r = []
@@ -42,7 +43,7 @@ def candidateMappingSelection(subquery: list[TriplePattern], mappings: list[Virt
             r.append(m) if m not in r else None
     return r
 
-def materializeVirtualMappingGroupCTX(vms : list[VirtualMapping], ctx: QueryContext):
+def materializeVirtualMappingGroup(vms : list[VirtualMapping], ctx: QueryContext):
     vms_groups = getVirtualMappingsGroups(vms)
     for url, mappings in vms_groups.items():
         url_next = url
@@ -85,51 +86,12 @@ def materializeVirtualMappingGroupCTX(vms : list[VirtualMapping], ctx: QueryCont
                         ctx.graph.add((URIRef(r_subj), URIRef(m.p), URIRef(m.o)))
     return ctx
 
-def materializeVirtualMappingGroup(vms : list[VirtualMapping], bindings: list[dict], tps: list[TriplePattern]):
-    triples_acc = []
-    vms_groups = getVirtualMappingsGroups(vms)
-    for url, mappings in vms_groups.items():
-        url_next = url
-        while url_next:
-            try:
-                r = requests.get(url_next, params={"f": "json", "limit": "2000"}).json()
-                #print(url_next)
-            except:
-                return pd.DataFrame([], columns=['Subject', 'Predicate', 'Object']), bindings
-            #Podemos usar mappings[0] porque todos los mappings comparten sujeto?
-            next = JSONPath(mappings[0].nextPage).parse(r) if mappings[0].nextPage != None else []
 
-            url_next = next[0] if len(next) else False
-            
-            if isinstance(mappings[0].s, Reference):
-                template = mappings[0].s
-                refs = re.findall(r"\{(.*?)\}", template)
-                values_per_ref = [JSONPath(ref).parse(r) for ref in refs]
-                r_subj = []
-                for vals in zip(*values_per_ref):  # empareja 1 a 1
-                    result = template
-                    for ref, val in zip(refs, vals):
-                        result = result.replace(f"{{{ref}}}", str(val))
-                    r_subj.append(result)
-            else:
-                r_subj=mappings[0].s
+def evalStarShapedSubQuerys(ctx: QueryContext, starShapedSubQueries: dict, mappings) -> Generator[FrozenBindings, None, None]:
+    suj, tps = starShapedSubQueries.items()
+    mappings_for_subq = candidateMappingSelection(starShapedSubQueries, mappings)
 
-            for m in mappings: 
-                if isinstance(m.o, Reference):
-                    r_obj = JSONPath(m.o).parse(r) 
-                    r_subj = [mappings[0].s for _ in r_obj] if isinstance(mappings[0].s, URIRef) else r_subj # In case subject is a constant, r_subj and r_obj must be same size in order to zip correctly
-
-                    tripletas = [
-                    (sujeto, m.p, objeto) 
-                    for sujeto, objeto in zip(r_subj, r_obj)
-                    ]
-                elif isinstance(m.o, URIRef): # Object is a constant URI, not a Reference   
-                    tripletas = [(sujeto, m.p, m.o) for sujeto in r_subj] if isinstance(mappings[0].s, Reference) else [(r_subj, m.p, m.o)] # If both subject and object are constant (not Reference), only a triple is generated
-                triples_acc.extend(tripletas)
-
-    df_triples = pd.DataFrame(triples_acc, columns=['Subject', 'Predicate', 'Object'])    
-
-    return df_triples, bindings
+    return None
 
 from collections import defaultdict
 

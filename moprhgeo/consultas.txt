@@ -1,0 +1,71 @@
+PREFIX geo: <http://www.opengis.net/ont/geosparql#> 
+PREFIX ogc: <http://www.ogc.org/> 
+SELECT ?x ?y WHERE {
+    ?x a ogc:railwaystationnode .
+    ?x ogc:nombre "Apartadero de Padrón Barbanza" .
+} 
+
+PREFIX geo: <http://www.opengis.net/ont/geosparql#> 
+PREFIX ogc: <http://www.ogc.org/> 
+PREFIX sdmx-measure: <http://purl.org/linked-data/sdmx/2009/measure#>
+PREFIX qb: <http://purl.org/linked-data/cube#> 
+PREFIX ine: <https://stats.linkeddata.es/voc/cubes/obs/>
+SELECT ?x ?z WHERE {
+    ?x a ogc:railwaystationnode . 
+    ?x ogc:nombre "Apartadero de Padrón Barbanza" .
+    ine:1.6_200301 sdmx-measure:obsValue ?o  .
+} 
+
+PREFIX ogc: <http://www.ogc.org/>
+PREFIX ine: <https://stats.linkeddata.es/voc/cubes/obs/>
+PREFIX sdmx-measure: <http://purl.org/linked-data/sdmx/2009/measure#>
+PREFIX sdmx-dimension: <http://purl.org/linked-data/sdmx/2009/dimension#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
+PREFIX ex: <http://example.org/function/>
+
+SELECT ?x WHERE {
+    ?x a ogc:railwaystationnode ;
+        geo:hasGeometry ?geom .
+FILTER ( 
+  geof:sfContains(
+    "POLYGON((-9.085693 42.592935, -7.668457 42.592935, -7.668457 43.244952, -9.085693 43.244952, -9.085693 42.592935))"^^geo:wktLiteral, 
+    ?geom)
+   )
+  }
+
+PREFIX ogc: <http://www.ogc.org/>
+PREFIX ine: <https://stats.linkeddata.es/voc/cubes/obs/>
+PREFIX sdmx-measure: <http://purl.org/linked-data/sdmx/2009/measure#>
+PREFIX sdmx-dimension: <http://purl.org/linked-data/sdmx/2009/dimension#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
+PREFIX ex: <http://example.org/function/>
+
+SELECT ?a WHERE {
+    ?r a ogc:railwaystationnode ;
+        ogc:nombre "Estación de A Coruña                                                                                " ;
+        geo:hasGeometry ?geom1 .
+    ?a a ogc:agua:estado_masas_aguasub ;
+        geo:hasGeometry ?geom2 .
+    FILTER ( geof:sfContains(?geom2, ?geom1) )
+}
+
+PREFIX ogc: <http://www.ogc.org/>
+PREFIX ine: <https://stats.linkeddata.es/voc/cubes/obs/>
+PREFIX sdmx-measure: <http://purl.org/linked-data/sdmx/2009/measure#>
+PREFIX sdmx-dimension: <http://purl.org/linked-data/sdmx/2009/dimension#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
+PREFIX ex: <http://example.org/function/>
+
+SELECT ?n ?dist WHERE {
+    ?x a ogc:railwaystationnode ;
+        geo:hasGeometry ?geom1 ;
+        ogc:nombre "Apartadero de Padrón Barbanza" .
+    ?y a ogc:railwaystationnode ;
+        geo:hasGeometry ?geom2 ;
+        ogc:nombre ?n .
+    BIND(geof:distance(?geom1, ?geom2) AS ?dist)
+    FILTER(?dist < 10000) # Lugares a menos de 5km
+  }
