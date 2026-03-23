@@ -32,7 +32,7 @@ FILTER (
     "POLYGON((-9.085693 42.592935, -7.668457 42.592935, -7.668457 43.244952, -9.085693 43.244952, -9.085693 42.592935))"^^geo:wktLiteral, 
     ?geom)
    )
-  }
+}
 
 PREFIX ogc: <http://www.ogc.org/>
 PREFIX ine: <https://stats.linkeddata.es/voc/cubes/obs/>
@@ -69,3 +69,75 @@ SELECT ?n ?dist WHERE {
     BIND(geof:distance(?geom1, ?geom2) AS ?dist)
     FILTER(?dist < 10000) # Lugares a menos de 5km
   }
+
+PREFIX ogc: <http://www.ogc.org/>
+PREFIX ine: <https://stats.linkeddata.es/voc/cubes/obs/>
+PREFIX sdmx-measure: <http://purl.org/linked-data/sdmx/2009/measure#>
+PREFIX sdmx-dimension: <http://purl.org/linked-data/sdmx/2009/dimension#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
+PREFIX ex: <http://example.org/function/>
+
+SELECT ?y ?dist WHERE {
+    ?x a ogc:railwaystationnode ;
+        geo:hasGeometry ?geom1 ;
+        ogc:nombre "Estación de Casal" .
+    ?y a ogc:railwaylink ;
+        geo:hasGeometry ?geom2 .
+    BIND(geof:distance(?geom1, ?geom2) AS ?dist)
+    FILTER(?dist < 10000) # Lugares a menos de 5km
+  }
+
+PREFIX ogc: <http://www.ogc.org/>
+PREFIX ine: <https://stats.linkeddata.es/voc/cubes/obs/>
+PREFIX sdmx-measure: <http://purl.org/linked-data/sdmx/2009/measure#>
+PREFIX sdmx-dimension: <http://purl.org/linked-data/sdmx/2009/dimension#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
+PREFIX ex: <http://example.org/function/>
+
+SELECT DISTINCT ?ny ?nz WHERE {
+    ?x a ogc:railwaystationnode ;
+        geo:hasGeometry ?geom1 ;
+        ogc:nombre "Estación de Santiago de Compostela" .
+    ?y a ogc:railwaystationnode ;
+        geo:hasGeometry ?geom2 ;
+        ogc:nombre ?ny .
+    ?z a ogc:railwaystationnode ;
+        geo:hasGeometry ?geom3 ;
+        ogc:nombre ?nz .
+    BIND(geof:distance(?geom1, ?geom2) AS ?dist)
+    BIND(geof:distance(?geom3, ?geom2) AS ?dist2)
+    FILTER(?dist < 10000 && ?dist2 < 10000) 
+  }
+
+PREFIX ogc: <http://www.ogc.org/>
+PREFIX ine: <https://stats.linkeddata.es/voc/cubes/obs/>
+PREFIX sdmx-measure: <http://purl.org/linked-data/sdmx/2009/measure#>
+PREFIX sdmx-dimension: <http://purl.org/linked-data/sdmx/2009/dimension#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
+PREFIX ex: <http://example.org/function/>
+
+SELECT ?a ?na WHERE {
+    ?x a ogc:railwaystationnode ;
+        geo:hasGeometry ?geom1 ;
+        ogc:nombre "Estación de Santiago de Compostela" .
+    ?y a ogc:railwaystationnode ;
+        geo:hasGeometry ?geom2 ;
+        ogc:nombre ?ny .
+
+    ?a a ogc:agua:estado_masas_aguasub ;
+        geo:hasGeometry ?geom3 ;
+        ogc:nom_masa ?na .
+
+    FILTER ( geof:sfContains(?geom3, ?geom2) && ?dist < 10000)
+    BIND(geof:distance(?geom1, ?geom2) AS ?dist)
+  }
+
+
+
+/Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/mapama-features/mappings/agua:estado_masas_aguasub_mapping.ttl
+/Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/idee-features/mappings/railwaystationnode_mapping.ttl
+/Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/LinkedOpenDataINE/autogenAPI/mappings/50902/50902_det0_tip_mappings.rml.ttl
+/Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/idee-features/mappings/railwaylink_mapping.ttl

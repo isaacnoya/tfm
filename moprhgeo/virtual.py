@@ -1,5 +1,5 @@
 from classes import *
-from utils import get_invariant
+from utils import get_invariant, getBaseURL, merge_urls
 
 import copy
 from mappings import get_compatible_mappings
@@ -7,7 +7,14 @@ import rdflib
 import requests
 from rdflib import Graph, URIRef, BNode, Literal, Namespace, Variable
 import pandas as pd
-from rdflib.plugins.sparql.sparql import FrozenBindings, QueryContext
+from rdflib.plugins.sparql.sparql import (
+    AlreadyBound,
+    FrozenBindings,
+    FrozenDict,
+    Query,
+    QueryContext,
+    SPARQLError,
+)
 
 
 from pathlib import Path
@@ -87,14 +94,9 @@ def materializeVirtualMappingGroup(vms : list[VirtualMapping], ctx: QueryContext
     return ctx
 
 
-def evalStarShapedSubQuerys(ctx: QueryContext, starShapedSubQueries: dict, mappings) -> Generator[FrozenBindings, None, None]:
-    suj, tps = starShapedSubQueries.items()
-    mappings_for_subq = candidateMappingSelection(starShapedSubQueries, mappings)
 
-    return None
 
 from collections import defaultdict
-
 def getStarShapedSubqueries(triple_patterns):
     star_groups = defaultdict(list)
     
@@ -126,3 +128,186 @@ def getVirtualMappingsGroups(mappings: list[VirtualMapping]):
         final_result[full_url] = mappings_list
 
     return final_result
+
+def yield_flatten(items):
+    for item in items:
+        if isinstance(item, set):
+            yield from yield_flatten(item)
+        else:
+            yield item
+
+def getMappingsFromBGP(ctx: MappingContext, tps: list[TriplePattern], mappings: list[VirtualMapping]):
+    if not tps:
+        yield from yield_flatten(ctx.mappings)
+        #yield ctx.mappings
+        return
+
+    tp = tps[0]
+    s, p, o = tp.s, tp.p, tp.o
+    _s = ctx[s] 
+    _p = ctx[p] 
+    _o = ctx[o] 
+
+    _tp = TriplePattern(_s, _p, _o) 
+    c_mappings = get_compatible_mappings(_tp, mappings) 
+    for m in c_mappings:
+        m = copy.copy(m)
+        ss = m.s
+        sp = m.p
+        so = m.o
+    
+        if None in (_s, _p, _o):
+            c = ctx.push()
+        else:
+            c = ctx
+
+        try:
+            if _p is None:
+                c[p] = sp
+        except AlreadyBound:
+            continue
+    
+        try:
+            if _o is None:
+                c[o] = so
+        except AlreadyBound:
+            continue
+        
+        if _s is None:
+            c[s] = ss 
+
+        m.setBindingVariables(s, p , o)
+        params = {}
+
+        if isinstance(_tp.o, Literal) and m.filterx is not None and _p is not None:
+            param = m.filterx.replace("@{1}", str(_tp.o))
+            key, value = param.split('=')
+            params = params | {key: value}
+            req = requests.Request('GET', m.source, params=params).prepare()
+            m.source=req.url
+
+        """
+        for vm in ctx.mappings:
+            if m.safeUnifySourceMapping(vm):
+                req = requests.Request('GET', vm.source, params=params).prepare()
+                vm.source=req.url
+        """
+        c.mappings.append(m) 
+
+        for res in getMappingsFromBGP(c, tps[1:], mappings):
+            yield res
+
+    return None
+
+
+def evalVirtualBGP(ctx: QueryContext, bgp: list[TriplePattern],  mappingGroups: dict):
+    if not bgp:
+        yield ctx.solution()
+        return
+    
+    tp = bgp[0]
+    s, p, o = tp.s, tp.p, tp.o
+
+    _s = ctx[s] 
+    _p = ctx[p] 
+    _o = ctx[o] 
+
+    materializeCompatibleMappingGroup(ctx, tp, mappingGroups)    
+    for ss, sp, so in ctx.graph.triples((_s, _p, _o)):  # type: ignore[union-attr, arg-type]
+        if None in (_s, _p, _o):
+            c = ctx.push()
+        else:
+            c = ctx
+
+        if _s is None:
+            # type error: Incompatible types in assignment (expression has type "Union[Node, Any]", target has type "Identifier")
+            c[s] = ss  # type: ignore[assignment]
+
+        try:
+            if _p is None:
+                # type error: Incompatible types in assignment (expression has type "Union[Node, Any]", target has type "Identifier")
+                c[p] = sp  # type: ignore[assignment]
+        except AlreadyBound:
+            continue
+
+        try:
+            if _o is None:
+                # type error: Incompatible types in assignment (expression has type "Union[Node, Any]", target has type "Identifier")
+                c[o] = so  # type: ignore[assignment]
+        except AlreadyBound:
+            continue
+
+        for x in evalVirtualBGP(c, bgp[1:], mappingGroups):
+            yield x
+
+    return None
+
+def isCompatibleMappingGroup(tp, mappings):
+    for m in mappings:
+        ms, mp, mo = m.bindingVariables
+        if tp.s == ms and tp.p == mp and tp.o == mo:
+            return True
+    return False
+
+def materializeGroup(ctx, mappings):
+    url_next = merge_urls([m.source for m in mappings])
+    while url_next:
+        try:
+            r = requests.get(url_next, params={"f": "json", "limit": "2000"}).json()
+            #print(url_next)
+        except:
+            r = {} 
+        #Podemos usar mappings[0] porque todos los mappings comparten sujeto?
+        next = JSONPath(mappings[0].nextPage).parse(r) if mappings[0].nextPage != None else []
+
+        url_next = next[0] if len(next) else False
+                
+        if isinstance(mappings[0].s, Reference):
+            template = mappings[0].s
+            refs = re.findall(r"\{(.*?)\}", template)
+            values_per_ref = [JSONPath(ref).parse(r) for ref in refs]
+            r_subj = []
+            for vals in zip(*values_per_ref):  # empareja 1 a 1
+                result = template
+                for ref, val in zip(refs, vals):
+                    result = result.replace(f"{{{ref}}}", str(val))
+                r_subj.append(result)
+        else:
+            r_subj=mappings[0].s
+
+        for m in mappings: 
+            if isinstance(m.o, Reference):
+                r_obj = JSONPath(m.o).parse(r) 
+                r_subj = [mappings[0].s for _ in r_obj] if isinstance(mappings[0].s, URIRef) else r_subj # In case subject is a constant, r_subj and r_obj must be same size in order to zip correctly
+                for sujeto, objeto in zip(r_subj, r_obj):
+                    ctx.graph.add((URIRef(sujeto), URIRef(m.p), Literal(objeto)))
+            elif isinstance(m.o, URIRef): # Object is a constant URI, not a Reference
+                if isinstance(mappings[0].s, Reference):
+                    for sujeto in r_subj:
+                        ctx.graph.add((URIRef(sujeto), URIRef(m.p), URIRef(m.o)))
+                else: 
+                    ctx.graph.add((URIRef(r_subj), URIRef(m.p), URIRef(m.o)))
+    return ctx
+
+def materializeCompatibleMappingGroup(ctx, tp, mappingGroups):
+    for key in list(mappingGroups.keys()):
+        mappings = mappingGroups[key]
+
+        if isCompatibleMappingGroup(tp, mappings):
+            ctx = materializeGroup(ctx, mappings)
+            del mappingGroups[key]  
+
+    return ctx, mappingGroups
+
+def getMappingGroups(mappings: set[VirtualMapping]) -> dict:
+    groups = defaultdict(list)
+
+    for m in mappings:
+        key = (
+            getBaseURL(m.source),
+            m.bindingVariables[0], #variable sujeto
+            m.s
+        )
+        groups[key].append(m)
+
+    return groups

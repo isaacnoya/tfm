@@ -10,12 +10,19 @@ RML_PREDICATE_SHORTCUT = f'{RML_NAMESPACE}predicate'
 RML_OBJECT_SHORTCUT = f'{RML_NAMESPACE}object'
 RML_PREDICATE_OBJECT_MAP = f'{RML_NAMESPACE}predicateObjectMap'
 RML_CLASS = f'{RML_NAMESPACE}class'
+RML_PARENT_TRIPLES_MAP = f'{RML_NAMESPACE}parentTriplesMap'
+RML_TERM_TYPE = f'{RML_NAMESPACE}termType'
 
 
 class Reference(rdflib.term.Literal):
     def __init__(self, value, *args, **kwargs):
             super().__init__()    
 
+class Template(rdflib.term.Literal):
+    def __init__(self, value, *args, **kwargs):
+            super().__init__()    
+
+from urllib.parse import urlparse
 class VirtualMapping:
     def __init__(self, subject=None, predicate=None, objec=None, reference=None, source=None, iterator=None, nextPage=None, filterx=None, projectx=None):
         if subject != None:
@@ -37,10 +44,23 @@ class VirtualMapping:
         self.projectx = projectx
     
     def setBindingVariables(self, bs, bp, bo):
-        bs = bs if isinstance(bs, rdflib.term.Variable) else None
-        bp = bp if isinstance(bs, rdflib.term.Variable) else None
-        bo = bo if isinstance(bs, rdflib.term.Variable) else None
+        bs = bs 
+        bp = bp 
+        bo = bo 
         self.bindingVariables = (bs, bp, bo)
+    
+    def safeUnifySourceMapping(self, vm):
+        def obtener_url_base(url):
+            parsed_url = urlparse(url)
+            # Reconstruimos solo con el esquema (http/https) y el netloc (dominio + puerto)
+            return f"{parsed_url.scheme}://{parsed_url.netloc}"
+        if obtener_url_base(self.source) != obtener_url_base(vm.source):
+            return False
+
+        
+        if self.bindingVariables[0] != vm.bindingVariables[0]:  #Acting over the same subject variable
+            return False
+        return True
 
     def saturateLiteral(self, literal, iterator):
         """
@@ -58,9 +78,45 @@ class VirtualMapping:
             return rdflib.term.Literal(resultado)
         else:
             return rdflib.term.Literal(f"{iterator}.{literal}")
+    def __hash__(self):
+        return hash((
+            self.s,
+            self.p,
+            self.o,
+            getattr(self, "source", None),
+            self.bindingVariables
+        ))
+    def __eq__(self, other):
+        if not isinstance(other, VirtualMapping):
+            return False
+        return (
+            getattr(self, "s", None) == getattr(other, "s", None) and
+            getattr(self, "p", None) == getattr(other, "p", None) and
+            getattr(self, "o", None) == getattr(other, "o", None) and
+            getattr(self, "source", None) == getattr(other, "source", None) and
+            getattr(self, "bindingVariables", None) == getattr(other, "bindingVariables", None)
+        )
         
 class TriplePattern:
     def __init__(self, s, p, o):
-        self.s=s
+        self.s=s 
         self.p=p
         self.o=o
+
+
+class MappingContext(rdflib.plugins.sparql.sparql.QueryContext):
+    def __init__(self, *args, mappings=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.mappings = mappings or []
+
+    def clone(self, bindings=None):
+        r = MappingContext(
+            self._dataset if self._dataset is not None else self.graph,
+            bindings or self.bindings,
+            initBindings=self.initBindings,
+            mappings=list(self.mappings),  
+        )
+        r.prologue = self.prologue
+        r.graph = self.graph
+        r.bnodes = self.bnodes
+        return r

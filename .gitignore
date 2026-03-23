@@ -10,3 +10,5 @@ pruebas.ipynb
 tfm.txt
 OGCmappingGenerator/.env
 moprhgeo/mappings.txt
+.vscode/*
+.vscode

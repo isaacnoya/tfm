@@ -4,9 +4,9 @@ from rdflib.plugins.sparql.operators import register_custom_function
 from rdflib import Variable
 from typing import Generator
 
-from virtual import getStarShapedSubqueries, candidateMappingSelection, materializeVirtualMappingGroup
+from virtual import getStarShapedSubqueries, candidateMappingSelection, materializeVirtualMappingGroup, getMappingsFromBGP, evalVirtualBGP, getMappingGroups
 from mappings import getMappingsFromTxT
-from classes import TriplePattern
+from classes import TriplePattern, MappingContext
 from geoFunctions import GEOF_SFCONTAINS, geof_sfContains, GEOF_GETBBOX, getBBox, GEOF_DISTANCE, geof_distance
 
 
@@ -14,19 +14,14 @@ from geoFunctions import GEOF_SFCONTAINS, geof_sfContains, GEOF_GETBBOX, getBBox
 mappings = getMappingsFromTxT("/Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/moprhgeo/mappings.txt")
 
 """
-SELECT ?r ?p ?o WHERE {
-    ?r a ogc:railwaystationnode ;
-        ?p "Estación de A Coruña                                                                                " .
-}
-no se boundea por sujeto, si ya se que la variable tiene que ser de una clase, deberia de obviar el resto de mappings que matchean, en caso de que sean subclase y tal, deberia de haber un rewritting de la query
-esto no lo tira bien, la segunda tripleta deberia de estar boundeada, pero no
-Voy a tener que ir triple pattern uno a uno? Deberia de acumular consultas en un stack y ejecutar al final del starsahped subquery?
+!!! Estudiar que forma es mejor de agrupar mappnigns 
 
-el materialize virtual mappings mio tendria que ser el evalBGP, entonces tendria que sacar el getVirtualMappingsGroups y meterlo antes tambien.
-    Entender como va lo del push del ctx para poder guardar toda la informacion necesaria bien.
+--- Operaciones geo en local son costosas, igual si que es mejor delegar en la API, el problema es que no todas las APIs permitern filtros espaciales
+--- Lo que si que soportan son bboxes, entonces puedo ir filtrando la consulta igual
 
-Tengo que implementar lo de los bindings, en mi propio evalBGP, porque las optimizaciones de filtro son sobre literales que me vienen en la consulta, no de los que consigo en consultas anteriores,
-tengo que guardar en el contexto los bindings de las variables, de forma que pueda hacer filtros en las consultas
+
++++ Solucionar termCompatibility, sobre todo para diferenciar templates de sujeto(deberian de ser subclase de URIRef) y referencias de objeto
+
 
 El contains se puede hacer por defecto con el bbox= que es rapido y todas las APIs lo tienen implementado
 """
@@ -35,7 +30,6 @@ def virtual_bgp_eval(ctx: QueryContext, part) -> Generator[FrozenBindings, None,
     if part.name != "BGP":
         raise NotImplementedError()
     
-    ctx = ctx.pushGraph(rdflib.Graph())
     tps = []
     for s, p, o in part.triples:
         tp = TriplePattern(s, p, o)
@@ -56,7 +50,54 @@ def virtual_bgp_eval(ctx: QueryContext, part) -> Generator[FrozenBindings, None,
     )
     return rdflib.plugins.sparql.evaluate.evalBGP(ctx, triples)
 
-CUSTOM_EVALS["virtual_bgp"] = virtual_bgp_eval
+def virtual_bgp_eval2(ctx: QueryContext, part) -> Generator[FrozenBindings, None, None]:
+    if part.name != "BGP":
+        raise NotImplementedError()
+    
+    tps = []
+    for s, p, o in part.triples:
+        tp = TriplePattern(s, p, o)
+        tps.append(tp)
+
+    subqueries = getStarShapedSubqueries(tps)
+
+    for suj, tps in subqueries.items():
+        mappings_for_subq = set()
+        ctxMapping = MappingContext()
+        for m in getMappingsFromBGP(ctxMapping, tps, mappings):
+            mappings_for_subq.add(m)
+        
+        ctx = materializeVirtualMappingGroup(
+            mappings_for_subq,
+            ctx
+        )
+
+    triples = sorted(
+        part.triples, key=lambda t: len([n for n in t if ctx[n] is None])
+    )
+    return rdflib.plugins.sparql.evaluate.evalBGP(ctx, triples)
+
+def virtual_bgp_eval3(ctx: QueryContext, part) -> Generator[FrozenBindings, None, None]:
+    if part.name != "BGP":
+        raise NotImplementedError()
+    
+    tps = []
+    triples = sorted(
+        part.triples, key=lambda t: len([n for n in t if ctx[n] is None])
+    )
+    for s, p, o in triples:
+        tp = TriplePattern(s, p, o)
+        tps.append(tp)
+
+    mappingsBGP = set()
+    ctxMapping = MappingContext()
+    for m in getMappingsFromBGP(ctxMapping, tps, mappings):
+        mappingsBGP.add(m)    
+
+    return evalVirtualBGP(ctx, tps, getMappingGroups(mappingsBGP))
+
+
+CUSTOM_EVALS["virtual_bgp"] = virtual_bgp_eval3
 register_custom_function(GEOF_SFCONTAINS, geof_sfContains)
 register_custom_function(GEOF_GETBBOX, getBBox)
 register_custom_function(GEOF_DISTANCE, geof_distance)
@@ -74,17 +115,18 @@ PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
 PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
 PREFIX ex: <http://example.org/function/>
 
-SELECT ?y ?dist WHERE {
+SELECT ?x WHERE {
     ?x a ogc:railwaystationnode ;
-        geo:hasGeometry ?geom1 ;
-        ogc:nombre "Apartadero de Padrón Barbanza" .
-    ?y a ogc:railwaylink ;
-        geo:hasGeometry ?geom2 .
-    BIND(geof:distance(?geom1, ?geom2) AS ?dist)
-    FILTER(?dist < 10000) # Lugares a menos de 5km
-  }
+        geo:hasGeometry ?geom .
+FILTER ( 
+  geof:sfContains(
+    "POLYGON((-9.085693 42.592935, -7.668457 42.592935, -7.668457 43.244952, -9.085693 43.244952, -9.085693 42.592935))"^^geo:wktLiteral, 
+    ?geom)
+   )
+}
 """
 
 qres = g.query(query)
 for r in qres:
     print(r)
+    #print("\n")
