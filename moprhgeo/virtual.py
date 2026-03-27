@@ -179,8 +179,8 @@ def getMappingsFromBGP(ctx: MappingContext, tps: list[TriplePattern], mappings: 
         m.setBindingVariables(s, p , o)
         params = {}
 
-        if isinstance(_tp.o, Literal) and m.filterx is not None and _p is not None:
-            param = m.filterx.replace("@{1}", str(_tp.o))
+        if (type(_tp.o) is Literal or type(tp.o) is Variable) and m.filterx is not None and _p is not None:
+            param = m.filterx.replace("@{1}", str(tp.o)) if type(_tp.o) is Literal else m.filterx.replace("@{1}", "variable("+str(tp.o)+")")
             key, value = param.split('=')
             params = params | {key: value}
             req = requests.Request('GET', m.source, params=params).prepare()
@@ -200,7 +200,7 @@ def getMappingsFromBGP(ctx: MappingContext, tps: list[TriplePattern], mappings: 
     return None
 
 
-def evalVirtualBGP(ctx: QueryContext, bgp: list[TriplePattern],  mappingGroups: dict):
+def evalVirtualBGP(ctx: QueryContext, bgp: list[TriplePattern],  mappingGroups: dict, triggers, queriesMade):
     if not bgp:
         yield ctx.solution()
         return
@@ -212,7 +212,7 @@ def evalVirtualBGP(ctx: QueryContext, bgp: list[TriplePattern],  mappingGroups: 
     _p = ctx[p] 
     _o = ctx[o] 
 
-    materializeCompatibleMappingGroup(ctx, tp, mappingGroups)    
+    materializeCompatibleMappingGroup(ctx, tp, mappingGroups, triggers, queriesMade)    
     for ss, sp, so in ctx.graph.triples((_s, _p, _o)):  # type: ignore[union-attr, arg-type]
         if None in (_s, _p, _o):
             c = ctx.push()
@@ -237,7 +237,7 @@ def evalVirtualBGP(ctx: QueryContext, bgp: list[TriplePattern],  mappingGroups: 
         except AlreadyBound:
             continue
 
-        for x in evalVirtualBGP(c, bgp[1:], mappingGroups):
+        for x in evalVirtualBGP(c, bgp[1:], mappingGroups, triggers, queriesMade):
             yield x
 
     return None
@@ -249,12 +249,43 @@ def isCompatibleMappingGroup(tp, mappings):
             return True
     return False
 
-def materializeGroup(ctx, mappings):
+import re
+from urllib.parse import urlparse, urlunparse, parse_qsl, urlencode
+
+def injectBindings(ctx, url):
+    url_parts = list(urlparse(url))
+    query_params = parse_qsl(url_parts[4]) 
+    
+    nuevos_params = []
+    
+    for key, value in query_params:
+        match = re.search(r'variable\((\w+)\)', value)        
+        if match:
+            var_name = match.group(1)
+            valor_ctx = ctx[Variable(var_name)]
+            
+            if valor_ctx is not None:
+                nuevo_valor = value.replace(match.group(0), str(valor_ctx))
+                nuevos_params.append((key, nuevo_valor))
+        else:
+            nuevos_params.append((key, value))
+
+    url_parts[4] = urlencode(nuevos_params)
+    return urlunparse(url_parts)
+
+def materializeGroup(ctx, mappings, suj, queriesMade):
     url_next = merge_urls([m.source for m in mappings])
+    url_next = injectBindings(ctx, url_next)
+
+    if (url_next, suj) in queriesMade:
+        return ctx
+
+    queriesMade.add((url_next, suj))
+
     while url_next:
         try:
             r = requests.get(url_next, params={"f": "json", "limit": "2000"}).json()
-            #print(url_next)
+            print(url_next)
         except:
             r = {} 
         #Podemos usar mappings[0] porque todos los mappings comparten sujeto?
@@ -289,13 +320,15 @@ def materializeGroup(ctx, mappings):
                     ctx.graph.add((URIRef(r_subj), URIRef(m.p), URIRef(m.o)))
     return ctx
 
-def materializeCompatibleMappingGroup(ctx, tp, mappingGroups):
+def materializeCompatibleMappingGroup(ctx, tp, mappingGroups, triggers, queriesMade):
     for key in list(mappingGroups.keys()):
         mappings = mappingGroups[key]
 
-        if isCompatibleMappingGroup(tp, mappings):
-            ctx = materializeGroup(ctx, mappings)
-            del mappingGroups[key]  
+        # Only materialize when tp is the trigger tp for the mappingGroup (the firts tp)
+        if isCompatibleMappingGroup(tp, mappings) and (triggers[key] == tp or triggers[key] is None):
+            triggers[key] = tp
+            ctx = materializeGroup(ctx, mappings, key[1], queriesMade)
+            #del mappingGroups[key] 
 
     return ctx, mappingGroups
 
@@ -309,5 +342,28 @@ def getMappingGroups(mappings: set[VirtualMapping]) -> dict:
             m.s
         )
         groups[key].append(m)
-
+    
     return groups
+
+
+def orderTriplesStatic(ctx, triples) -> list:
+    def count_free_vars(t):
+        return sum(1 for node in t if ctx[node] is None)
+
+    sujeto_min_vars = {}
+    for t in triples:
+        s = t[0]
+        v_count = count_free_vars(t)
+        if s not in sujeto_min_vars or v_count < sujeto_min_vars[s]:
+            sujeto_min_vars[s] = v_count
+        
+    triplesOut = sorted(
+        triples,
+        key=lambda t: (
+            sujeto_min_vars[t[0]], # Primero el grupo del sujeto más "prometedor"
+            t[0],                  # Forzamos que el mismo sujeto esté contiguo
+            count_free_vars(t)     # Dentro del grupo, la más restrictiva primero
+        )
+    )
+    
+    return triplesOut
