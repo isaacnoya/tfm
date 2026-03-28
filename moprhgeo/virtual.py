@@ -1,5 +1,6 @@
 from classes import *
 from utils import get_invariant, getBaseURL, merge_urls
+from geoFunctions import getBbox, parse_geom
 
 import copy
 from mappings import get_compatible_mappings
@@ -21,6 +22,9 @@ from pathlib import Path
 from jsonpath import JSONPath
 from io import StringIO
 from typing import Generator
+
+EX = rdflib.Namespace("http://example.com/")
+
 
 def candidateMappingSelection(subquery: list[TriplePattern], mappings: list[VirtualMapping]):
     r = []
@@ -185,6 +189,14 @@ def getMappingsFromBGP(ctx: MappingContext, tps: list[TriplePattern], mappings: 
             params = params | {key: value}
             req = requests.Request('GET', m.source, params=params).prepare()
             m.source=req.url
+        
+        if type(_tp.o) is BoundedGeometry and m.filterx is not None and _p is not None:
+            param = m.filterx.replace("@{1}", getBbox(parse_geom(_tp.o)))
+            key, value = param.split('=')
+            params = params | {key: value}
+            req = requests.Request('GET', m.source, params=params).prepare()
+            m.source=req.url
+
 
         """
         for vm in ctx.mappings:
@@ -263,10 +275,17 @@ def injectBindings(ctx, url):
         if match:
             var_name = match.group(1)
             valor_ctx = ctx[Variable(var_name)]
+
+            var_id = URIRef(f"urn:var:{var_name}")
+            bbox = ctx.graph.value(var_id, EX.hasBBox)
             
             if valor_ctx is not None:
-                nuevo_valor = value.replace(match.group(0), str(valor_ctx))
+                nuevo_valor = value.replace(match.group(0), str(valor_ctx)) 
                 nuevos_params.append((key, nuevo_valor))
+            elif bbox is not None:
+                nuevo_valor = value.replace(match.group(0), getBbox(parse_geom(bbox)))
+                nuevos_params.append((key, nuevo_valor))
+
         else:
             nuevos_params.append((key, value))
 

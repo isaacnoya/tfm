@@ -1,32 +1,36 @@
 from rdflib.plugins.sparql import CUSTOM_EVALS
 from rdflib.plugins.sparql.sparql import FrozenBindings, QueryContext
+from rdflib.plugins.sparql.evaluate import evalPart
 from rdflib.plugins.sparql.operators import register_custom_function
-from rdflib import Variable
+from rdflib import Variable, Namespace
 from typing import Generator
+
+from rdflib.plugins.sparql.evalutils import (
+    _ebv,
+    _eval,
+    _fillTemplate,
+    _join,
+    _minus,
+    _val,
+)
 
 from virtual import getStarShapedSubqueries, candidateMappingSelection, materializeVirtualMappingGroup, getMappingsFromBGP, evalVirtualBGP, getMappingGroups, orderTriplesStatic
 from mappings import getMappingsFromTxT
-from classes import TriplePattern, MappingContext
-from geoFunctions import GEOF_SFCONTAINS, geof_sfContains, GEOF_GETBBOX, getBBox, GEOF_DISTANCE, geof_distance
+from classes import TriplePattern, MappingContext, BoundedGeometry
+from geoFunctions import GEOF_SFCONTAINS, geof_sfContains, GEOF_DISTANCE, geof_distance
 
+EX = Namespace("http://example.com/")
 
 
 mappings = getMappingsFromTxT("/Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/moprhgeo/mappings.txt")
 
 """
 !!! hacer un selectNextTriplePattern? para evaluar dinamicamente la tripleta a evaluar?
-!!! igual no deberia de eliminar el mappingGroup despues de ejecutarlo, sencillamente tener una lista con las consultas ya ejecutadas
-!!! si el objeto del tp es una variable y el mapping tiene filterx, se le mete en la uri como ?nombre={variable(o)} o algo asi, y para cada binding que entre se sustituye y se ejecuta.
 
-
-!!! Estudiar que forma es mejor de agrupar mappnigns
-!!! Me compensa hacer muchas consultas filtradas por nombre cada una? o mejor la consulta general y ya 
-
---- Operaciones geo en local son costosas, igual si que es mejor delegar en la API, el problema es que no todas las APIs permitern filtros espaciales
---- Lo que si que soportan son bboxes, entonces puedo ir filtrando la consulta igual
-
-
++++ Revisar lo de los triggers y la lista de queriesMade, sobretodo los triggers q son demasiado dependientes del ordering creo
++++ Mejorar orderTriples, me huele a que se rompe facil
 +++ Solucionar termCompatibility, sobre todo para diferenciar templates de sujeto(deberian de ser subclase de URIRef) y referencias de objeto
++++ Estudiar que forma es mejor de agrupar mappnigns
 
 
 El contains se puede hacer por defecto con el bbox= que es rapido y todas las APIs lo tienen implementado
@@ -112,13 +116,35 @@ def virtual_bgp_eval3(ctx: QueryContext, part) -> Generator[FrozenBindings, None
     queriesMade = set()
     return evalVirtualBGP(ctx, tps, mappingGroups, trigers, queriesMade)
 
-def virtual_filter(ctx, part):
-    return None
+def virtualGeoFilter(ctx: QueryContext, part) -> Generator[FrozenBindings, None, None]:
+    if part.name != "Filter":
+        raise NotImplementedError()
+    
+    if part.expr.iri == GEOF_SFCONTAINS:
+        container, contained = part.expr.expr
+
+        if type(contained) is Variable and type(container) is rdflib.term.Literal:
+            ctx.graph.add((
+                rdflib.term.URIRef(f"urn:var:{contained}"),
+                EX.hasBBox,
+                rdflib.term.Literal(container)
+            ))
+            #ctx[contained] = BoundedGeometry(f"{container}")
+    
+    def _auxGen(ctx, part):
+        for c in evalPart(ctx, part.p):
+            if _ebv(
+                part.expr,
+                c.forget(ctx, _except=part._vars) if not part.no_isolated_scope else c,
+            ):
+                yield c
+
+    return _auxGen(ctx, part)
 
 
 CUSTOM_EVALS["virtual_bgp"] = virtual_bgp_eval3
+CUSTOM_EVALS["virtualGeofilter"] = virtualGeoFilter
 register_custom_function(GEOF_SFCONTAINS, geof_sfContains)
-register_custom_function(GEOF_GETBBOX, getBBox)
 register_custom_function(GEOF_DISTANCE, geof_distance)
 
 import rdflib
@@ -134,12 +160,17 @@ PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
 PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
 PREFIX ex: <http://example.org/function/>
 
-SELECT ?y WHERE {
-    ?x a ogc:railwaystationnode ;
-        ogc:nombre "Apartadero de Padrón Barbanza" ;
-        ogc:use ?use .
-    ?y a ogc:railwaystationnode ;
-        ogc:use ?use .
+SELECT ?x ?e ?n WHERE {
+    ?x a ogc:standingwater ;
+        ogc:id_demarcd ?n ;
+        ogc:elevacion ?e ;
+        geo:hasGeometry ?geom .
+
+FILTER ( 
+  geof:sfContains(
+    "POLYGON((-9.085693 42.592935, -7.668457 42.592935, -7.668457 43.244952, -9.085693 43.244952, -9.085693 42.592935))"^^geo:wktLiteral, 
+    ?geom)
+   )
 }
 """
 

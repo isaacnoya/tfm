@@ -7,7 +7,6 @@ from geopy.distance import geodesic
 GEOF_SFCONTAINS = URIRef(
     "http://www.opengis.net/def/function/geosparql/sfContains"
 )
-GEOF_GETBBOX = URIRef("http://example.org/function/getBBox")
 GEOF_DISTANCE = URIRef("http://www.opengis.net/def/function/geosparql/distance")
 
 import json
@@ -34,9 +33,13 @@ def geof_distance(geom1, geom2):
     
     return Literal(distancia)
 
+def getBbox(g):
+    minx, miny, maxx, maxy = g.bounds
+    return f"{minx},{miny},{maxx},{maxy}"
+
 def parse_geom(g):
 
-    g = g.toPython()
+    g = g.toPython() if type(g) is not str else g
 
     if isinstance(g, dict):   # GeoJSON dict
         return shape(g)
@@ -61,12 +64,3 @@ def geof_sfContains(geom1, geom2):
 
     return Literal(g1.contains(g2))
 
-def getBBox(geom):
-
-    g = parse_geom(geom)
-
-    minx, miny, maxx, maxy = g.bounds
-
-    bbox = f"{minx},{miny},{maxx},{maxy}"
-
-    return Literal(bbox)

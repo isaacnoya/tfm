@@ -21,6 +21,10 @@ class Reference(rdflib.term.Literal):
 class Template(rdflib.term.Literal):
     def __init__(self, value, *args, **kwargs):
             super().__init__()    
+            
+class BoundedGeometry(rdflib.term.Literal):
+    def __init__(self, value, *args, **kwargs):
+            super().__init__()    
 
 from urllib.parse import urlparse
 class VirtualMapping:
@@ -120,3 +124,8 @@ class MappingContext(rdflib.plugins.sparql.sparql.QueryContext):
         r.graph = self.graph
         r.bnodes = self.bnodes
         return r
+
+
+    
+
+

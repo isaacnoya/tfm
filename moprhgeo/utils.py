@@ -1,6 +1,8 @@
 import rdflib
 import re
 from classes import *
+
+from rdflib.plugins.sparql.sparql import AlreadyBound
   
 
 def rdf_class_to_pom(mapping_graph):
@@ -124,5 +126,5 @@ def getBaseURL(url):
         ''   # fragment
     ))
     
-    return base_url    
+    return base_url   
 
