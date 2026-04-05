@@ -8,6 +8,10 @@ GEOF_SFCONTAINS = URIRef(
     "http://www.opengis.net/def/function/geosparql/sfContains"
 )
 GEOF_DISTANCE = URIRef("http://www.opengis.net/def/function/geosparql/distance")
+GEOF_WITHIN = URIRef("http://www.opengis.net/def/function/geosparql/sfWithin")
+GEOF_INTESECT = URIRef("http://www.opengis.net/def/function/geosparql/sfIntersects")
+GEOF_OVERLAPS = URIRef("http://www.opengis.net/def/function/geosparql/sfOverlaps")
+GEOF_CROSSES = URIRef("http://www.opengis.net/def/function/geosparql/sfCrosses")
 
 import json
 from shapely.geometry import shape
@@ -64,3 +68,30 @@ def geof_sfContains(geom1, geom2):
 
     return Literal(g1.contains(g2))
 
+def geof_within(geom1, geom2):
+
+    g1 = parse_geom(geom1)
+    g2 = parse_geom(geom2)
+
+    return Literal(g1.within(g2))   
+
+def geof_intersects(geom1, geom2):
+
+    g1 = parse_geom(geom1)
+    g2 = parse_geom(geom2)
+
+    return Literal(g1.intersects(g2))
+
+def geof_overlaps(geom1, geom2):
+
+    g1 = parse_geom(geom1)
+    g2 = parse_geom(geom2)
+
+    return Literal(g1.overlaps(g2))
+
+def geof_crosses(geom1, geom2):
+
+    g1 = parse_geom(geom1)
+    g2 = parse_geom(geom2)
+
+    return Literal(g1.crosses(g2))

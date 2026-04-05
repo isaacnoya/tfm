@@ -189,13 +189,6 @@ def getMappingsFromBGP(ctx: MappingContext, tps: list[TriplePattern], mappings: 
             params = params | {key: value}
             req = requests.Request('GET', m.source, params=params).prepare()
             m.source=req.url
-        
-        if type(_tp.o) is BoundedGeometry and m.filterx is not None and _p is not None:
-            param = m.filterx.replace("@{1}", getBbox(parse_geom(_tp.o)))
-            key, value = param.split('=')
-            params = params | {key: value}
-            req = requests.Request('GET', m.source, params=params).prepare()
-            m.source=req.url
 
 
         """
@@ -263,6 +256,7 @@ def isCompatibleMappingGroup(tp, mappings):
 
 import re
 from urllib.parse import urlparse, urlunparse, parse_qsl, urlencode
+from classes import geoBindings
 
 def injectBindings(ctx, url):
     url_parts = list(urlparse(url))
@@ -276,16 +270,14 @@ def injectBindings(ctx, url):
             var_name = match.group(1)
             valor_ctx = ctx[Variable(var_name)]
 
-            var_id = URIRef(f"urn:var:{var_name}")
-            bbox = ctx.graph.value(var_id, EX.hasBBox)
+            geoBindings_value = ctx[geoBindings.get(Variable(var_name), None)]
             
             if valor_ctx is not None:
                 nuevo_valor = value.replace(match.group(0), str(valor_ctx)) 
                 nuevos_params.append((key, nuevo_valor))
-            elif bbox is not None:
-                nuevo_valor = value.replace(match.group(0), getBbox(parse_geom(bbox)))
+            elif geoBindings_value is not None:
+                nuevo_valor = value.replace(match.group(0), getBbox(parse_geom(geoBindings_value)))
                 nuevos_params.append((key, nuevo_valor))
-
         else:
             nuevos_params.append((key, value))
 
@@ -347,7 +339,6 @@ def materializeCompatibleMappingGroup(ctx, tp, mappingGroups, triggers, queriesM
         if isCompatibleMappingGroup(tp, mappings) and (triggers[key] == tp or triggers[key] is None):
             triggers[key] = tp
             ctx = materializeGroup(ctx, mappings, key[1], queriesMade)
-            #del mappingGroups[key] 
 
     return ctx, mappingGroups
 
@@ -366,23 +357,37 @@ def getMappingGroups(mappings: set[VirtualMapping]) -> dict:
 
 
 def orderTriplesStatic(ctx, triples) -> list:
-    def count_free_vars(t):
-        return sum(1 for node in t if ctx[node] is None)
-
-    sujeto_min_vars = {}
+    grupos = {}
     for t in triples:
         s = t[0]
-        v_count = count_free_vars(t)
-        if s not in sujeto_min_vars or v_count < sujeto_min_vars[s]:
-            sujeto_min_vars[s] = v_count
-        
-    triplesOut = sorted(
-        triples,
-        key=lambda t: (
-            sujeto_min_vars[t[0]], # Primero el grupo del sujeto más "prometedor"
-            t[0],                  # Forzamos que el mismo sujeto esté contiguo
-            count_free_vars(t)     # Dentro del grupo, la más restrictiva primero
-        )
+        grupos.setdefault(s, []).append(t)
+
+    def score_grupo(triples_grupo):
+        score = 0
+        for t in triples_grupo:
+            obj = t[2]
+            if type(obj) is rdflib.term.Literal:
+                score += 1
+            geoBind = geoBindings.get(obj, None)
+            if type(geoBind) is Variable:
+                score -= 5
+            if type(geoBind) is rdflib.term.Literal:
+                score += 5
+        return score
+
+    grupos_con_score = [
+        (sujeto, triples_grupo, score_grupo(triples_grupo))
+        for sujeto, triples_grupo in grupos.items()
+    ]
+
+    grupos_ordenados = sorted(
+        grupos_con_score,
+        key=lambda item: item[2],
+        reverse=True
     )
-    
-    return triplesOut
+
+    resultado = []
+    for sujeto, triples_grupo, _ in grupos_ordenados:
+        resultado.extend(triples_grupo)
+
+    return resultado

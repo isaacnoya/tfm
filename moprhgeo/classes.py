@@ -13,16 +13,16 @@ RML_CLASS = f'{RML_NAMESPACE}class'
 RML_PARENT_TRIPLES_MAP = f'{RML_NAMESPACE}parentTriplesMap'
 RML_TERM_TYPE = f'{RML_NAMESPACE}termType'
 
+from collections import defaultdict
+geoBindings = dict()
+
+
 
 class Reference(rdflib.term.Literal):
     def __init__(self, value, *args, **kwargs):
             super().__init__()    
 
 class Template(rdflib.term.Literal):
-    def __init__(self, value, *args, **kwargs):
-            super().__init__()    
-            
-class BoundedGeometry(rdflib.term.Literal):
     def __init__(self, value, *args, **kwargs):
             super().__init__()    
 

@@ -16,8 +16,8 @@ from rdflib.plugins.sparql.evalutils import (
 
 from virtual import getStarShapedSubqueries, candidateMappingSelection, materializeVirtualMappingGroup, getMappingsFromBGP, evalVirtualBGP, getMappingGroups, orderTriplesStatic
 from mappings import getMappingsFromTxT
-from classes import TriplePattern, MappingContext, BoundedGeometry
-from geoFunctions import GEOF_SFCONTAINS, geof_sfContains, GEOF_DISTANCE, geof_distance
+from classes import TriplePattern, MappingContext, geoBindings
+from geoFunctions import GEOF_SFCONTAINS, geof_sfContains, GEOF_DISTANCE, geof_distance, GEOF_WITHIN, geof_within, GEOF_INTESECT, geof_intersects, GEOF_OVERLAPS, geof_overlaps, GEOF_CROSSES, geof_crosses
 
 EX = Namespace("http://example.com/")
 
@@ -25,6 +25,8 @@ EX = Namespace("http://example.com/")
 mappings = getMappingsFromTxT("/Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/moprhgeo/mappings.txt")
 
 """
+!!! Los geoBindings tienen que ser listas, porque pueden estar bindeados a varios filtros, entonces getBBox deberia de recibir la lista de geometrias, y sacar el bbox global.
+
 !!! hacer un selectNextTriplePattern? para evaluar dinamicamente la tripleta a evaluar?
 
 +++ Revisar lo de los triggers y la lista de queriesMade, sobretodo los triggers q son demasiado dependientes del ordering creo
@@ -120,17 +122,23 @@ def virtualGeoFilter(ctx: QueryContext, part) -> Generator[FrozenBindings, None,
     if part.name != "Filter":
         raise NotImplementedError()
     
-    if part.expr.iri == GEOF_SFCONTAINS:
-        container, contained = part.expr.expr
+    if part.expr.iri == GEOF_SFCONTAINS or part.expr.iri == GEOF_WITHIN:
+        container, contained = part.expr.expr if part.expr.iri == GEOF_SFCONTAINS else (part.expr.expr[1], part.expr.expr[0])
 
         if type(contained) is Variable and type(container) is rdflib.term.Literal:
-            ctx.graph.add((
-                rdflib.term.URIRef(f"urn:var:{contained}"),
-                EX.hasBBox,
-                rdflib.term.Literal(container)
-            ))
-            #ctx[contained] = BoundedGeometry(f"{container}")
-    
+            geoBindings[contained] = container
+        if type(contained) is Variable and type(container) is Variable:
+            geoBindings[contained] = container
+    if part.expr.iri == GEOF_INTESECT or part.expr.iri == GEOF_OVERLAPS:
+        geom1, geom2 = part.expr.expr
+        if type(geom1) is Variable and type(geom2) is rdflib.term.Literal:
+            geoBindings[geom1] = geom2
+        if type(geom2) is Variable and type(geom1) is rdflib.term.Literal:
+            geoBindings[geom2] = geom1
+        if type(geom2) is Variable and type(geom1) is Variable:
+            geoBindings[geom2] = geom1
+            geoBindings[geom1] = geom2
+
     def _auxGen(ctx, part):
         for c in evalPart(ctx, part.p):
             if _ebv(
@@ -146,6 +154,10 @@ CUSTOM_EVALS["virtual_bgp"] = virtual_bgp_eval3
 CUSTOM_EVALS["virtualGeofilter"] = virtualGeoFilter
 register_custom_function(GEOF_SFCONTAINS, geof_sfContains)
 register_custom_function(GEOF_DISTANCE, geof_distance)
+register_custom_function(GEOF_WITHIN, geof_within)
+register_custom_function(GEOF_INTESECT, geof_intersects)
+register_custom_function(GEOF_OVERLAPS, geof_overlaps)
+register_custom_function(GEOF_CROSSES, geof_crosses)
 
 import rdflib
 g = rdflib.Graph()
@@ -160,17 +172,18 @@ PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
 PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
 PREFIX ex: <http://example.org/function/>
 
-SELECT ?x ?e ?n WHERE {
-    ?x a ogc:standingwater ;
-        ogc:id_demarcd ?n ;
-        ogc:elevacion ?e ;
+SELECT ?s WHERE {
+    ?g a ogc:administrativeunit ;
+        ogc:nameunit "Galicia" ;
+        geo:hasGeometry ?geomG .
+    ?s a ogc:administrativeunit ;
+        geo:hasGeometry ?geomS .
+    ?x a ogc:railwaystationnode ;
+        ogc:nombre "Estación de Casal" ;
         geo:hasGeometry ?geom .
-
-FILTER ( 
-  geof:sfContains(
-    "POLYGON((-9.085693 42.592935, -7.668457 42.592935, -7.668457 43.244952, -9.085693 43.244952, -9.085693 42.592935))"^^geo:wktLiteral, 
-    ?geom)
-   )
+        
+FILTER ( geof:sfContains(?geomG, ?geomS) )
+FILTER ( geof:sfWithin(?geom, ?geomS) )
 }
 """
 

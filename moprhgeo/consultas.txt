@@ -187,6 +187,40 @@ SELECT ?y ?use WHERE {
         ogc:use ?use .
 }
 
+PREFIX ogc: <http://www.ogc.org/>
+PREFIX ine: <https://stats.linkeddata.es/voc/cubes/obs/>
+PREFIX sdmx-measure: <http://purl.org/linked-data/sdmx/2009/measure#>
+PREFIX sdmx-dimension: <http://purl.org/linked-data/sdmx/2009/dimension#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
+PREFIX ex: <http://example.org/function/>
+
+SELECT ?x WHERE {
+    ?y a ogc:agua:estado_masas_aguasub ;
+        ogc:objectid 10 ;
+        geo:hasGeometry ?geom1 .
+    ?x a ogc:railwaystationnode ;
+        geo:hasGeometry ?geom2 .
+FILTER ( geof:sfWithin(?geom2, ?geom1) )
+}
+
+
+PREFIX ogc: <http://www.ogc.org/>
+PREFIX ine: <https://stats.linkeddata.es/voc/cubes/obs/>
+PREFIX sdmx-measure: <http://purl.org/linked-data/sdmx/2009/measure#>
+PREFIX sdmx-dimension: <http://purl.org/linked-data/sdmx/2009/dimension#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
+PREFIX ex: <http://example.org/function/>
+
+SELECT ?x WHERE {
+    ?y a ogc:administrativeunit ;
+        ogc:nameunit "Galicia" ;
+        geo:hasGeometry ?geom1 .
+    ?x a ogc:railwaystationnode ;
+        geo:hasGeometry ?geom2 .
+FILTER ( geof:sfWithin(?geom2, ?geom1) )
+}
 
 
 /Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/mapama-features/mappings/agua:estado_masas_aguasub_mapping.ttl
