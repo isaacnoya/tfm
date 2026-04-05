@@ -14,7 +14,7 @@ RML_PARENT_TRIPLES_MAP = f'{RML_NAMESPACE}parentTriplesMap'
 RML_TERM_TYPE = f'{RML_NAMESPACE}termType'
 
 from collections import defaultdict
-geoBindings = dict()
+geoBindings = defaultdict(list)
 
 
 

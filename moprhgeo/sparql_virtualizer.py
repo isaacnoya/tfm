@@ -26,6 +26,10 @@ mappings = getMappingsFromTxT("/Users/kekojohns/Library/CloudStorage/OneDrive-Pe
 
 """
 !!! Los geoBindings tienen que ser listas, porque pueden estar bindeados a varios filtros, entonces getBBox deberia de recibir la lista de geometrias, y sacar el bbox global.
+    -Mirar que furrulen las demas funciones geo
+    -hacer la triquiñuela con el distance
+
+
 
 !!! hacer un selectNextTriplePattern? para evaluar dinamicamente la tripleta a evaluar?
 
@@ -126,18 +130,18 @@ def virtualGeoFilter(ctx: QueryContext, part) -> Generator[FrozenBindings, None,
         container, contained = part.expr.expr if part.expr.iri == GEOF_SFCONTAINS else (part.expr.expr[1], part.expr.expr[0])
 
         if type(contained) is Variable and type(container) is rdflib.term.Literal:
-            geoBindings[contained] = container
+            geoBindings[contained].append(container)
         if type(contained) is Variable and type(container) is Variable:
-            geoBindings[contained] = container
+            geoBindings[contained].append(container)
     if part.expr.iri == GEOF_INTESECT or part.expr.iri == GEOF_OVERLAPS:
         geom1, geom2 = part.expr.expr
         if type(geom1) is Variable and type(geom2) is rdflib.term.Literal:
-            geoBindings[geom1] = geom2
+            geoBindings[geom1].append(geom2)
         if type(geom2) is Variable and type(geom1) is rdflib.term.Literal:
-            geoBindings[geom2] = geom1
+            geoBindings[geom2].append(geom1)
         if type(geom2) is Variable and type(geom1) is Variable:
-            geoBindings[geom2] = geom1
-            geoBindings[geom1] = geom2
+            geoBindings[geom2].append(geom1)
+            geoBindings[geom1].append(geom2)
 
     def _auxGen(ctx, part):
         for c in evalPart(ctx, part.p):
@@ -172,17 +176,13 @@ PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
 PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
 PREFIX ex: <http://example.org/function/>
 
-SELECT ?s WHERE {
+SELECT ?x WHERE {
     ?g a ogc:administrativeunit ;
-        ogc:nameunit "Galicia" ;
-        geo:hasGeometry ?geomG .
-    ?s a ogc:administrativeunit ;
+        ogc:nameunit "Santiago de Compostela" ;
         geo:hasGeometry ?geomS .
-    ?x a ogc:railwaystationnode ;
-        ogc:nombre "Estación de Casal" ;
+    ?x a ogc:standingwater ;
         geo:hasGeometry ?geom .
-        
-FILTER ( geof:sfContains(?geomG, ?geomS) )
+
 FILTER ( geof:sfWithin(?geom, ?geomS) )
 }
 """

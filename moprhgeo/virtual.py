@@ -1,6 +1,6 @@
 from classes import *
 from utils import get_invariant, getBaseURL, merge_urls
-from geoFunctions import getBbox, parse_geom
+from geoFunctions import getBbox
 
 import copy
 from mappings import get_compatible_mappings
@@ -183,6 +183,7 @@ def getMappingsFromBGP(ctx: MappingContext, tps: list[TriplePattern], mappings: 
         m.setBindingVariables(s, p , o)
         params = {}
 
+        # !!!! esto igual lo podria hacer al parsear los mappings y queda mas limpio !!!!
         if (type(_tp.o) is Literal or type(tp.o) is Variable) and m.filterx is not None and _p is not None:
             param = m.filterx.replace("@{1}", str(tp.o)) if type(_tp.o) is Literal else m.filterx.replace("@{1}", "variable("+str(tp.o)+")")
             key, value = param.split('=')
@@ -270,13 +271,13 @@ def injectBindings(ctx, url):
             var_name = match.group(1)
             valor_ctx = ctx[Variable(var_name)]
 
-            geoBindings_value = ctx[geoBindings.get(Variable(var_name), None)]
+            geoBindings_value = [ctx[i] for i in geoBindings.get(Variable(var_name), [])]
             
             if valor_ctx is not None:
                 nuevo_valor = value.replace(match.group(0), str(valor_ctx)) 
                 nuevos_params.append((key, nuevo_valor))
-            elif geoBindings_value is not None:
-                nuevo_valor = value.replace(match.group(0), getBbox(parse_geom(geoBindings_value)))
+            elif geoBindings_value and all(v is not None for v in geoBindings_value):
+                nuevo_valor = value.replace(match.group(0), getBbox(geoBindings_value))
                 nuevos_params.append((key, nuevo_valor))
         else:
             nuevos_params.append((key, value))

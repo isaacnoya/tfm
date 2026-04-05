@@ -222,6 +222,46 @@ SELECT ?x WHERE {
 FILTER ( geof:sfWithin(?geom2, ?geom1) )
 }
 
+## OPTIMIZAR ESTO, ME DA LA SENSACION DE QUE DENERIA DE IR MAS RAPIDO
+PREFIX ogc: <http://www.ogc.org/>
+PREFIX ine: <https://stats.linkeddata.es/voc/cubes/obs/>
+PREFIX sdmx-measure: <http://purl.org/linked-data/sdmx/2009/measure#>
+PREFIX sdmx-dimension: <http://purl.org/linked-data/sdmx/2009/dimension#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
+PREFIX ex: <http://example.org/function/>
+
+SELECT ?s WHERE {
+    ?g a ogc:administrativeunit ;
+        ogc:nameunit "Galicia" ;
+        geo:hasGeometry ?geomG .
+    ?s a ogc:administrativeunit ;
+        geo:hasGeometry ?geomS .
+    ?x a ogc:railwaystationnode ;
+        ogc:nombre "Estación de Casal" ;
+        geo:hasGeometry ?geom .
+        
+FILTER ( geof:sfContains(?geomG, ?geomS) )
+FILTER ( geof:sfWithin(?geom, ?geomS) )
+}
+
+PREFIX ogc: <http://www.ogc.org/>
+PREFIX ine: <https://stats.linkeddata.es/voc/cubes/obs/>
+PREFIX sdmx-measure: <http://purl.org/linked-data/sdmx/2009/measure#>
+PREFIX sdmx-dimension: <http://purl.org/linked-data/sdmx/2009/dimension#>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
+PREFIX ex: <http://example.org/function/>
+
+SELECT ?x WHERE {
+    ?g a ogc:administrativeunit ;
+        ogc:nameunit "Santiago de Compostela" ;
+        geo:hasGeometry ?geomS .
+    ?x a ogc:railwaystationnode ;
+        geo:hasGeometry ?geom .
+
+FILTER ( geof:sfWithin(?geom, ?geomS) )
+}
 
 /Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/mapama-features/mappings/agua:estado_masas_aguasub_mapping.ttl
 /Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/idee-features/mappings/railwaystationnode_mapping.ttl

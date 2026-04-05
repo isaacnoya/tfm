@@ -37,8 +37,23 @@ def geof_distance(geom1, geom2):
     
     return Literal(distancia)
 
-def getBbox(g):
-    minx, miny, maxx, maxy = g.bounds
+def getBbox(geoms: list):
+    if not geoms:
+        return None
+
+    minx, miny, maxx, maxy = parse_geom(geoms[0]).bounds
+
+    for g in geoms[1:]:
+        g_minx, g_miny, g_maxx, g_maxy = parse_geom(g).bounds
+
+        minx = max(minx, g_minx)
+        miny = max(miny, g_miny)
+        maxx = min(maxx, g_maxx)
+        maxy = min(maxy, g_maxy)
+
+        if minx > maxx or miny > maxy:
+            return None  # o "" si prefieres string vacío
+
     return f"{minx},{miny},{maxx},{maxy}"
 
 def parse_geom(g):
