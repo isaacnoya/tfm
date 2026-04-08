@@ -7,7 +7,7 @@ from geopy.distance import geodesic
 GEOF_SFCONTAINS = URIRef(
     "http://www.opengis.net/def/function/geosparql/sfContains"
 )
-GEOF_DISTANCE = URIRef("http://www.opengis.net/def/function/geosparql/distance")
+GEOF_DISTANCE = URIRef("http://www.opengis.net/def/function/geosparql/sfDistance")
 GEOF_WITHIN = URIRef("http://www.opengis.net/def/function/geosparql/sfWithin")
 GEOF_INTESECT = URIRef("http://www.opengis.net/def/function/geosparql/sfIntersects")
 GEOF_OVERLAPS = URIRef("http://www.opengis.net/def/function/geosparql/sfOverlaps")
@@ -40,11 +40,11 @@ def geof_distance(geom1, geom2):
 def getBbox(geoms: list):
     if not geoms:
         return None
-
-    minx, miny, maxx, maxy = parse_geom(geoms[0]).bounds
+    fgeom = geoms[0]
+    minx, miny, maxx, maxy = get_offset_bounds(fgeom)
 
     for g in geoms[1:]:
-        g_minx, g_miny, g_maxx, g_maxy = parse_geom(g).bounds
+        g_minx, g_miny, g_maxx, g_maxy = get_offset_bounds(g)
 
         minx = max(minx, g_minx)
         miny = max(miny, g_miny)
@@ -110,3 +110,45 @@ def geof_crosses(geom1, geom2):
     g2 = parse_geom(geom2)
 
     return Literal(g1.crosses(g2))
+
+import math
+def meters_to_degrees(dist_meters, lat_reference):
+    """
+    Convierte una distancia en metros a desplazamientos en grados (offset_x, offset_y).
+    lat_reference: Latitud en la que se encuentra la geometría (en grados decimales).
+    """
+    # Constante aproximada del radio de la Tierra en metros (WGS84)
+    METERS_PER_DEGREE_LAT = 111111.0
+
+    # 1. El offset en Latitud (Y) es constante
+    offset_y = dist_meters / METERS_PER_DEGREE_LAT
+
+    # 2. El offset en Longitud (X) depende de la latitud (se estrecha hacia los polos)
+    # Convertimos la latitud a radianes para la función coseno
+    cos_lat = math.cos(math.radians(lat_reference))
+    
+    # Evitamos división por cero en los polos
+    if abs(cos_lat) < 1e-10:
+        offset_x = 0
+    else:
+        offset_x = dist_meters / (METERS_PER_DEGREE_LAT * cos_lat)
+
+    return offset_x, offset_y
+
+def get_offset_bounds(g_tuple):
+    geom_raw, dist_m = g_tuple
+    dist_m = float(dist_m) if dist_m else 0
+    # Obtenemos los límites originales en grados
+    b_minx, b_miny, b_maxx, b_maxy = parse_geom(geom_raw).bounds
+    
+    if dist_m == 0:
+        return (b_minx, b_miny, b_maxx, b_maxy)
+
+    # Calculamos la latitud media para ajustar la deformación del eje X
+    lat_media = (b_miny + b_maxy) / 2
+    
+    # Obtenemos los offsets en grados
+    dx, dy = meters_to_degrees(dist_m, lat_media)
+
+    # Aplicamos el margen (Buffer)
+    return (b_minx - dx, b_miny - dy, b_maxx + dx, b_maxy + dy)

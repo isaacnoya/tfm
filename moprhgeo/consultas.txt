@@ -280,3 +280,13 @@ SELECT ?x WHERE {
 
 FILTER ( geof:sfCrosses(?geom, ?geomS) )
 }
+
+SELECT ?x WHERE {
+    ?x a ogc:watercourselinksequence ;
+        geo:hasGeometry ?geom1 .
+    ?y a ogc:railwaystationnode ;
+        geo:hasGeometry ?geom2 ;
+        ogc:nombre "Estación de Casal" .
+
+    FILTER(geof:sfDistance(?geom1, ?geom2) < 5000)
+}

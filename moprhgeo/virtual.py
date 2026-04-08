@@ -270,13 +270,15 @@ def injectBindings(ctx, url):
         if match:
             var_name = match.group(1)
             valor_ctx = ctx[Variable(var_name)]
-
-            geoBindings_value = [ctx[i] for i in geoBindings.get(Variable(var_name), [])]
+            geoBindings_value = []
+            for i in geoBindings.get(Variable(var_name), []):
+                v, _, distance = i.partition(":-:") if ":-:" in i else (i, None, 0)
+                geoBindings_value.append((ctx[Variable(v)], distance))
             
             if valor_ctx is not None:
                 nuevo_valor = value.replace(match.group(0), str(valor_ctx)) 
                 nuevos_params.append((key, nuevo_valor))
-            elif geoBindings_value and all(v is not None for v in geoBindings_value):
+            elif len(geoBindings_value) and all(v[0] is not None for v in geoBindings_value):
                 nuevo_valor = value.replace(match.group(0), getBbox(geoBindings_value))
                 nuevos_params.append((key, nuevo_valor))
         else:

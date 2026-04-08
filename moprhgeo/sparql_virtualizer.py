@@ -26,7 +26,6 @@ mappings = getMappingsFromTxT("/Users/kekojohns/Library/CloudStorage/OneDrive-Pe
 
 """
 #TODO:  
-    -Implementar geo:sfDistance 
     -Implementar parentTriplesMap (aqui voy a tener que modificar el materializaGroup porque no contemplo que el objeto sea un Template)
 
 
@@ -136,6 +135,17 @@ def virtualGeoFilter(ctx: QueryContext, part) -> Generator[FrozenBindings, None,
         if type(geom2) is Variable and type(geom1) is Variable:
             geoBindings[geom2].append(geom1)
             geoBindings[geom1].append(geom2)
+    if part.expr.expr.iri == GEOF_DISTANCE and (part.expr.op == '<' or part.expr.op == '=' or part.expr.op == '<='):
+        geom1, geom2 = part.expr.expr.expr
+        distance = part.expr.other
+        if type(geom1) is Variable and type(geom2) is rdflib.term.Literal:
+            geoBindings[geom1].append(geom2+ ":-:" +str(distance))
+        if type(geom2) is Variable and type(geom1) is rdflib.term.Literal:
+            geoBindings[geom2].append(geom1+ ":-:" +str(distance))
+        if type(geom2) is Variable and type(geom1) is Variable:
+            geoBindings[geom2].append(geom1+ ":-:" +str(distance))
+            geoBindings[geom1].append(geom2+ ":-:" +str(distance))
+
 
     def _auxGen(ctx, part):
         for c in evalPart(ctx, part.p):
@@ -171,9 +181,14 @@ PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
 PREFIX ex: <http://example.org/function/>
 PREFIX qb: <http://purl.org/linked-data/cube#>
 
-SELECT ?s WHERE {
-    ?s a qb:slice ;
-        ine:ccaa "Galicia" .
+SELECT ?x WHERE {
+    ?x a ogc:watercourselinksequence ;
+        geo:hasGeometry ?geom1 .
+    ?y a ogc:railwaystationnode ;
+        geo:hasGeometry ?geom2 ;
+        ogc:nombre "Estación de Casal" .
+
+    FILTER(geof:sfDistance(?geom1, ?geom2) < 5000)
 }
 """
 
