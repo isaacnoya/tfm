@@ -178,7 +178,7 @@ def generate_mapping(collection, output_mappings_folder, urlBase):
 
     for prop in collection.properties: 
         add_pom_ref(triples_map, OGC[prop["title"]], f"properties.{prop['title']}", g_mappings, datatype=XSD[prop["type"]], filter=f"{prop['title']}"+"=@{1}") if prop["type"]!="number" else add_pom_ref(triples_map, OGC[prop["title"]], f"properties.{prop['title']}", g_mappings, datatype=XSD["float"], filter=f"{prop['title']}"+"=@{1}")
-    add_pom_ref(triples_map, GEO.hasGeometry, "geometry", g_mappings,  filter="?bbox={1}", datatype=GEO.geoJSONLiteral)
+    add_pom_ref(triples_map, GEO.hasGeometry, "geometry", g_mappings,  filter="bbox=@{1}", datatype=GEO.geoJSONLiteral)
     add_pom_ref(triples_map, OGC.geometryName, "geometry_name", g_mappings, datatype=XSD.string)
 
     tp_collecion = OGC[collection.id + "TriplesMap2"]

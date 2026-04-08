@@ -285,6 +285,9 @@ def injectBindings(ctx, url):
     url_parts[4] = urlencode(nuevos_params)
     return urlunparse(url_parts)
 
+def has_filter(ref: str) -> bool:
+        return '[?(' in ref
+
 def materializeGroup(ctx, mappings, suj, queriesMade):
     url_next = merge_urls([m.source for m in mappings])
     url_next = injectBindings(ctx, url_next)
@@ -319,11 +322,24 @@ def materializeGroup(ctx, mappings, suj, queriesMade):
             r_subj=mappings[0].s
 
         for m in mappings: 
-            if isinstance(m.o, Reference):
+            if isinstance(m.o, Reference) and not has_filter(m.o):
                 r_obj = JSONPath(m.o).parse(r) 
                 r_subj = [mappings[0].s for _ in r_obj] if isinstance(mappings[0].s, URIRef) else r_subj # In case subject is a constant, r_subj and r_obj must be same size in order to zip correctly
                 for sujeto, objeto in zip(r_subj, r_obj):
                     ctx.graph.add((URIRef(sujeto), URIRef(m.p), Literal(objeto)))
+            elif isinstance(m.o, Reference) and has_filter(m.o):    # caso ad hoc para referencias con filtro, poco general
+                join_key = refs[0].split('.')[-1]
+                entries = JSONPath("$.*").parse(r)
+                lookup_data = {item.get(join_key): item for item in entries if item.get(join_key)}
+                column_value = []
+                for key_value in values_per_ref[0]:
+                    match = lookup_data.get(key_value)
+                    if match:
+                        res = JSONPath(f"$.{m.o.removeprefix('$.*.')}").parse(match)
+                        ctx.graph.add((URIRef(template.replace(f"{{{refs[0]}}}", str(key_value))), URIRef(m.p), Literal(res[0]))) if res else None
+                    else:
+                        column_value.append(None)
+
             elif isinstance(m.o, URIRef): # Object is a constant URI, not a Reference
                 if isinstance(mappings[0].s, Reference):
                     for sujeto in r_subj:

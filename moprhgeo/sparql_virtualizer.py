@@ -25,21 +25,15 @@ EX = Namespace("http://example.com/")
 mappings = getMappingsFromTxT("/Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/moprhgeo/mappings.txt")
 
 """
-!!! Los geoBindings tienen que ser listas, porque pueden estar bindeados a varios filtros, entonces getBBox deberia de recibir la lista de geometrias, y sacar el bbox global.
-    -Mirar que furrulen las demas funciones geo
-    -hacer la triquiñuela con el distance
+#TODO:  
+    -Implementar geo:sfDistance 
+    -Implementar parentTriplesMap (aqui voy a tener que modificar el materializaGroup porque no contemplo que el objeto sea un Template)
 
 
-
-!!! hacer un selectNextTriplePattern? para evaluar dinamicamente la tripleta a evaluar?
-
-+++ Revisar lo de los triggers y la lista de queriesMade, sobretodo los triggers q son demasiado dependientes del ordering creo
-+++ Mejorar orderTriples, me huele a que se rompe facil
++++ hacer un selectNextTriplePattern? para evaluar dinamicamente la tripleta a evaluar?
 +++ Solucionar termCompatibility, sobre todo para diferenciar templates de sujeto(deberian de ser subclase de URIRef) y referencias de objeto
-+++ Estudiar que forma es mejor de agrupar mappnigns
 
 
-El contains se puede hacer por defecto con el bbox= que es rapido y todas las APIs lo tienen implementado
 """
 
 def virtual_bgp_eval(ctx: QueryContext, part) -> Generator[FrozenBindings, None, None]:
@@ -133,7 +127,7 @@ def virtualGeoFilter(ctx: QueryContext, part) -> Generator[FrozenBindings, None,
             geoBindings[contained].append(container)
         if type(contained) is Variable and type(container) is Variable:
             geoBindings[contained].append(container)
-    if part.expr.iri == GEOF_INTESECT or part.expr.iri == GEOF_OVERLAPS:
+    if part.expr.iri == GEOF_INTESECT or part.expr.iri == GEOF_OVERLAPS or part.expr.iri == GEOF_CROSSES:
         geom1, geom2 = part.expr.expr
         if type(geom1) is Variable and type(geom2) is rdflib.term.Literal:
             geoBindings[geom1].append(geom2)
@@ -169,21 +163,17 @@ g = rdflib.Graph()
 
 query = """
 PREFIX ogc: <http://www.ogc.org/>
-PREFIX ine: <https://stats.linkeddata.es/voc/cubes/obs/>
+PREFIX ine: <https://lod.ine.es/voc/cubes/vocabulary#>
 PREFIX sdmx-measure: <http://purl.org/linked-data/sdmx/2009/measure#>
 PREFIX sdmx-dimension: <http://purl.org/linked-data/sdmx/2009/dimension#>
 PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
 PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
 PREFIX ex: <http://example.org/function/>
+PREFIX qb: <http://purl.org/linked-data/cube#>
 
-SELECT ?x WHERE {
-    ?g a ogc:administrativeunit ;
-        ogc:nameunit "Santiago de Compostela" ;
-        geo:hasGeometry ?geomS .
-    ?x a ogc:standingwater ;
-        geo:hasGeometry ?geom .
-
-FILTER ( geof:sfWithin(?geom, ?geomS) )
+SELECT ?s WHERE {
+    ?s a qb:slice ;
+        ine:ccaa "Galicia" .
 }
 """
 
