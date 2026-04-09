@@ -41,7 +41,8 @@ class Collection:
 
     def _set_properties(self): 
         r = requests.get(self.url+ "/queryables" + "?f=json").json()
-        ret = JSONPath("$.properties").parse(r)[0]
+        ret = JSONPath("$.properties").parse(r)
+        ret = ret[0] if ret else {}
         l = []
         for i, v in ret.items():
             l.append({

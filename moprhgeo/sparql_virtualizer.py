@@ -27,12 +27,15 @@ mappings = getMappingsFromTxT("/Users/kekojohns/Library/CloudStorage/OneDrive-Pe
 """
 #TODO:  
     -Implementar parentTriplesMap (aqui voy a tener que modificar el materializaGroup porque no contemplo que el objeto sea un Template)
+    +-Mejorar como accedo a los filtros, porque estoy haciendo directamente part.expr.expr pero es poco robusto, en caso de que haya un sfWithin() && sfWithin() esto rompe.
 
++++ Query-Specific Pruning of RML Mappings:
+    -Puedo implementar el prunning al principio? ns si servira de algo, porque despues ya hago el select mapping
+    -En todo caso, la definición de incompatibilidad me la quedo
 
++++ en QueriesMade, tambien tener en cuenta si se ha hecho la misma consulta pero con un bbox que contenga plenamente al bbox a consultar.
 +++ hacer un selectNextTriplePattern? para evaluar dinamicamente la tripleta a evaluar?
 +++ Solucionar termCompatibility, sobre todo para diferenciar templates de sujeto(deberian de ser subclase de URIRef) y referencias de objeto
-
-
 """
 
 def virtual_bgp_eval(ctx: QueryContext, part) -> Generator[FrozenBindings, None, None]:
@@ -126,7 +129,7 @@ def virtualGeoFilter(ctx: QueryContext, part) -> Generator[FrozenBindings, None,
             geoBindings[contained].append(container)
         if type(contained) is Variable and type(container) is Variable:
             geoBindings[contained].append(container)
-    if part.expr.iri == GEOF_INTESECT or part.expr.iri == GEOF_OVERLAPS or part.expr.iri == GEOF_CROSSES:
+    elif part.expr.iri == GEOF_INTESECT or part.expr.iri == GEOF_OVERLAPS or part.expr.iri == GEOF_CROSSES:
         geom1, geom2 = part.expr.expr
         if type(geom1) is Variable and type(geom2) is rdflib.term.Literal:
             geoBindings[geom1].append(geom2)
@@ -135,7 +138,7 @@ def virtualGeoFilter(ctx: QueryContext, part) -> Generator[FrozenBindings, None,
         if type(geom2) is Variable and type(geom1) is Variable:
             geoBindings[geom2].append(geom1)
             geoBindings[geom1].append(geom2)
-    if part.expr.expr.iri == GEOF_DISTANCE and (part.expr.op == '<' or part.expr.op == '=' or part.expr.op == '<='):
+    elif part.expr.expr.iri == GEOF_DISTANCE and (part.expr.op == '<' or part.expr.op == '=' or part.expr.op == '<='):
         geom1, geom2 = part.expr.expr.expr
         distance = part.expr.other
         if type(geom1) is Variable and type(geom2) is rdflib.term.Literal:
@@ -181,14 +184,13 @@ PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
 PREFIX ex: <http://example.org/function/>
 PREFIX qb: <http://purl.org/linked-data/cube#>
 
-SELECT ?x WHERE {
-    ?x a ogc:watercourselinksequence ;
-        geo:hasGeometry ?geom1 .
-    ?y a ogc:railwaystationnode ;
-        geo:hasGeometry ?geom2 ;
-        ogc:nombre "Estación de Casal" .
-
-    FILTER(geof:sfDistance(?geom1, ?geom2) < 5000)
+SELECT DISTINCT ?y ?gy ?s ?gs WHERE {
+    ?s a ogc:administrativeunit ;
+       ogc:nameunit "Santiago de Compostela" ;
+       geo:hasGeometry ?gs .
+    ?y a ogc:watercourselinksequence ;
+        geo:hasGeometry ?gy .
+    FILTER (geof:sfWithin(?gy, ?gs))
 }
 """
 

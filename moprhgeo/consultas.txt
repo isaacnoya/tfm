@@ -290,3 +290,57 @@ SELECT ?x WHERE {
 
     FILTER(geof:sfDistance(?geom1, ?geom2) < 5000)
 }
+
+SELECT ?name ?distance WHERE {
+    ?x a ogc:lakes ;
+        geo:hasGeometry ?geom ;
+        ogc:name ?name .
+    ?y a ogc:administrativeunit ;
+        geo:hasGeometry ?geom2 ;
+        ogc:nameunit "Santiago de Compostela" .
+    BIND (geof:sfDistance(?geom2, ?geom) as ?distance)
+}
+
+SELECT ?y ?a WHERE {
+    ?s a ogc:administrativeunit ;
+       ogc:nameunit "Santiago de Compostela" ;
+       geo:hasGeometry ?gs .
+    {
+        ?y a ogc:standingwater ;
+            geo:hasGeometry ?gy ;
+            ogc:area ?a .
+        FILTER (geof:sfWithin(?gy, ?gs))
+    } UNION {
+        ?y a ogc:lakes ;
+            ogc:name_alt ?a
+    }
+}
+
+SELECT ?d WHERE {
+    ?s a ogc:administrativeunit ;
+       ogc:nameunit "Madrid" ;
+       geo:hasGeometry ?gs .
+
+    ?y a ogc:standingwater ;
+        geo:hasGeometry ?gy ;
+        ogc:area ?a .
+    FILTER (geof:sfWithin(?gy, ?gs))
+}
+ORDER BY ASC(?a)
+
+SELECT ?w ?nt ?dist WHERE {
+    ?s a ogc:administrativeunit ;
+       ogc:nameunit "Santiago de Compostela" ;
+       geo:hasGeometry ?gs .
+
+    ?w a ogc:watercourselinksequence ;
+        geo:hasGeometry ?gw .
+
+    ?t a ogc:railwaystationnode ;
+        ogc:nombre ?nt ;
+        geo:hasGeometry ?gt .
+    
+    FILTER (geof:sfWithin(?gw, ?gs))
+    FILTER (geof:sfWithin(?gt, ?gs))
+    BIND (geof:distance(?gw, ?gt) AS ?dist)
+}
