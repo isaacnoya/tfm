@@ -27,15 +27,23 @@ mappings = getMappingsFromTxT("/Users/kekojohns/Library/CloudStorage/OneDrive-Pe
 """
 #TODO:  
     -Implementar parentTriplesMap (aqui voy a tener que modificar el materializaGroup porque no contemplo que el objeto sea un Template)
-    +-Mejorar como accedo a los filtros, porque estoy haciendo directamente part.expr.expr pero es poco robusto, en caso de que haya un sfWithin() && sfWithin() esto rompe.
+    -Solucionar lo de la coordenada de referencia (ns q es), mirar https://pypi.org/project/pyproj/
+    -en QueriesMade, tambien tener en cuenta si se ha hecho la misma consulta pero con un bbox que contenga plenamente al bbox a consultar.
 
 +++ Query-Specific Pruning of RML Mappings:
     -Puedo implementar el prunning al principio? ns si servira de algo, porque despues ya hago el select mapping
     -En todo caso, la definición de incompatibilidad me la quedo
 
-+++ en QueriesMade, tambien tener en cuenta si se ha hecho la misma consulta pero con un bbox que contenga plenamente al bbox a consultar.
 +++ hacer un selectNextTriplePattern? para evaluar dinamicamente la tripleta a evaluar?
 +++ Solucionar termCompatibility, sobre todo para diferenciar templates de sujeto(deberian de ser subclase de URIRef) y referencias de objeto
+
+Optimizaciones implementadas (para acordarme):
+    -El select de mappings es flow unification, creo q es mejor q el estado del arte
+    -Binding restricted star shaped subqueries (tambien flow recursive unification)
+    -Ordenacion de tripletas
+    -Bindings geo con void:bbox
+    -Objetos literales + void:filter
+    -queriesMade teniendo en cuenta el bbox (si se ha hecho la misma consulta pero con un bbox que contenga plenamente al bbox a consultar, no hace falta hacer la consulta), si no se overlapean al completo, saca los fragmentos.
 """
 
 def virtual_bgp_eval(ctx: QueryContext, part) -> Generator[FrozenBindings, None, None]:
@@ -118,19 +126,18 @@ def virtual_bgp_eval3(ctx: QueryContext, part) -> Generator[FrozenBindings, None
     queriesMade = set()
     return evalVirtualBGP(ctx, tps, mappingGroups, trigers, queriesMade)
 
+
 def virtualGeoFilter(ctx: QueryContext, part) -> Generator[FrozenBindings, None, None]:
     if part.name != "Filter":
         raise NotImplementedError()
-    
-    if part.expr.iri == GEOF_SFCONTAINS or part.expr.iri == GEOF_WITHIN:
-        container, contained = part.expr.expr if part.expr.iri == GEOF_SFCONTAINS else (part.expr.expr[1], part.expr.expr[0])
 
+    def _append_contains(container, contained):
         if type(contained) is Variable and type(container) is rdflib.term.Literal:
             geoBindings[contained].append(container)
         if type(contained) is Variable and type(container) is Variable:
             geoBindings[contained].append(container)
-    elif part.expr.iri == GEOF_INTESECT or part.expr.iri == GEOF_OVERLAPS or part.expr.iri == GEOF_CROSSES:
-        geom1, geom2 = part.expr.expr
+
+    def _append_contains_bi(geom1, geom2):
         if type(geom1) is Variable and type(geom2) is rdflib.term.Literal:
             geoBindings[geom1].append(geom2)
         if type(geom2) is Variable and type(geom1) is rdflib.term.Literal:
@@ -138,16 +145,77 @@ def virtualGeoFilter(ctx: QueryContext, part) -> Generator[FrozenBindings, None,
         if type(geom2) is Variable and type(geom1) is Variable:
             geoBindings[geom2].append(geom1)
             geoBindings[geom1].append(geom2)
-    elif part.expr.expr.iri == GEOF_DISTANCE and (part.expr.op == '<' or part.expr.op == '=' or part.expr.op == '<='):
-        geom1, geom2 = part.expr.expr.expr
-        distance = part.expr.other
+
+    def _append_distance(geom1, geom2, distance):
+        distance = str(distance)
         if type(geom1) is Variable and type(geom2) is rdflib.term.Literal:
-            geoBindings[geom1].append(geom2+ ":-:" +str(distance))
+            geoBindings[geom1].append(geom2 + ":-:" + distance)
         if type(geom2) is Variable and type(geom1) is rdflib.term.Literal:
-            geoBindings[geom2].append(geom1+ ":-:" +str(distance))
+            geoBindings[geom2].append(geom1 + ":-:" + distance)
         if type(geom2) is Variable and type(geom1) is Variable:
-            geoBindings[geom2].append(geom1+ ":-:" +str(distance))
-            geoBindings[geom1].append(geom2+ ":-:" +str(distance))
+            geoBindings[geom2].append(geom1 + ":-:" + distance)
+            geoBindings[geom1].append(geom2 + ":-:" + distance)
+
+    def _is_distance_upper_bound(op, distance_on_left):
+        if distance_on_left:
+            return op in ("<", "<=", "=")
+        return op in (">", ">=", "=")
+
+    def _handle_geo_expr(expr):
+        iri = getattr(expr, "iri", None)
+        args = getattr(expr, "expr", None)
+        if not isinstance(args, (list, tuple)) or len(args) != 2:
+            return
+
+        if iri == GEOF_SFCONTAINS:
+            _append_contains(args[0], args[1])
+        elif iri == GEOF_WITHIN:
+            _append_contains(args[1], args[0])
+        elif iri == GEOF_INTESECT or iri == GEOF_OVERLAPS or iri == GEOF_CROSSES:
+            _append_contains_bi(args[0], args[1])
+        elif iri == GEOF_DISTANCE:
+            return
+
+    stack = [part.expr]
+    seen = set()
+    while stack:
+        expr = stack.pop()
+        if expr is None:
+            continue
+
+        expr_id = id(expr)
+        if expr_id in seen:
+            continue
+        seen.add(expr_id)
+
+        _handle_geo_expr(expr)
+
+        op = getattr(expr, "op", None)
+        if op is not None:
+            left = getattr(expr, "expr", None)
+            right = getattr(expr, "other", None)
+            if getattr(left, "iri", None) == GEOF_DISTANCE and _is_distance_upper_bound(op, True):
+                args = getattr(left, "expr", None)
+                if isinstance(args, (list, tuple)) and len(args) == 2:
+                    _append_distance(args[0], args[1], right)
+            elif getattr(right, "iri", None) == GEOF_DISTANCE and _is_distance_upper_bound(op, False):
+                args = getattr(right, "expr", None)
+                if isinstance(args, (list, tuple)) and len(args) == 2:
+                    _append_distance(args[0], args[1], left)
+
+        if isinstance(expr, (list, tuple)):
+            stack.extend(expr)
+            continue
+        if isinstance(expr, dict):
+            stack.extend(expr.values())
+            continue
+
+        values = getattr(expr, "values", None)
+        if callable(values):
+            try:
+                stack.extend(values())
+            except TypeError:
+                pass
 
 
     def _auxGen(ctx, part):
@@ -184,13 +252,20 @@ PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
 PREFIX ex: <http://example.org/function/>
 PREFIX qb: <http://purl.org/linked-data/cube#>
 
-SELECT DISTINCT ?y ?gy ?s ?gs WHERE {
+SELECT ?w ?t ?dist WHERE {
     ?s a ogc:administrativeunit ;
        ogc:nameunit "Santiago de Compostela" ;
        geo:hasGeometry ?gs .
-    ?y a ogc:watercourselinksequence ;
-        geo:hasGeometry ?gy .
-    FILTER (geof:sfWithin(?gy, ?gs))
+
+    ?w a ogc:standingwater ;
+        geo:hasGeometry ?gw .
+
+    ?t a ogc:watercourselinksequence ;
+        geo:hasGeometry ?gt .
+    
+    FILTER (geof:sfWithin(?gw, ?gs))
+    FILTER (geof:sfWithin(?gt, ?gs))
+    FILTER (geof:sfDistance(?gw, ?gt) < 5000)
 }
 """
 

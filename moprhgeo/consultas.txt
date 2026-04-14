@@ -333,7 +333,7 @@ SELECT ?w ?nt ?dist WHERE {
        ogc:nameunit "Santiago de Compostela" ;
        geo:hasGeometry ?gs .
 
-    ?w a ogc:watercourselinksequence ;
+    ?w a ogc:standingwater ;
         geo:hasGeometry ?gw .
 
     ?t a ogc:railwaystationnode ;
@@ -342,5 +342,5 @@ SELECT ?w ?nt ?dist WHERE {
     
     FILTER (geof:sfWithin(?gw, ?gs))
     FILTER (geof:sfWithin(?gt, ?gs))
-    BIND (geof:distance(?gw, ?gt) AS ?dist)
+    BIND (geof:sfDistance(?gw, ?gt) AS ?dist)
 }

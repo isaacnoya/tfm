@@ -1,6 +1,6 @@
 from classes import *
 from utils import get_invariant, getBaseURL, merge_urls
-from geoFunctions import getBbox
+from geoFunctions import getBbox, bbox_contains
 
 import copy
 from mappings import get_compatible_mappings
@@ -273,7 +273,7 @@ def injectBindings(ctx, url):
             geoBindings_value = []
             for i in geoBindings.get(Variable(var_name), []):
                 v, _, distance = i.partition(":-:") if ":-:" in i else (i, None, 0)
-                geoBindings_value.append((ctx[Variable(v)], distance))
+                geoBindings_value.append((ctx[Variable(v)], distance)) if ctx[Variable(v)] is not None else None
             
             if valor_ctx is not None:
                 nuevo_valor = value.replace(match.group(0), str(valor_ctx)) 
@@ -290,14 +290,40 @@ def injectBindings(ctx, url):
 def has_filter(ref: str) -> bool:
         return '[?(' in ref
 
+def _split_bbox_url(url):
+    url_parts = list(urlparse(url))
+    query_params = parse_qsl(url_parts[4], keep_blank_values=True)
+    bbox = None
+    filtered_params = []
+
+    for key, value in query_params:
+        if key == "bbox" and bbox is None:
+            try:
+                bbox = tuple(map(float, value.split(",")))
+            except (TypeError, ValueError):
+                bbox = None
+            continue
+        filtered_params.append((key, value))
+
+    url_parts[4] = urlencode(filtered_params)
+    return urlunparse(url_parts), bbox
+
+def querieMade(queriesMade, url_next, suj):
+    normalized_url, bbox = _split_bbox_url(url_next)
+
+    for url, previous_bbox, sujeto in queriesMade:
+        if url == normalized_url and sujeto == suj and bbox_contains(previous_bbox, bbox):
+            return True
+    
+    queriesMade.add((normalized_url, bbox, suj))
+    return False
+
 def materializeGroup(ctx, mappings, suj, queriesMade):
     url_next = merge_urls([m.source for m in mappings])
     url_next = injectBindings(ctx, url_next)
-
-    if (url_next, suj) in queriesMade:
+    
+    if querieMade(queriesMade, url_next, suj):
         return ctx
-
-    queriesMade.add((url_next, suj))
 
     while url_next:
         try:

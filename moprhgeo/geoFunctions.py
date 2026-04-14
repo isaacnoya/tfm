@@ -152,3 +152,74 @@ def get_offset_bounds(g_tuple):
 
     # Aplicamos el margen (Buffer)
     return (b_minx - dx, b_miny - dy, b_maxx + dx, b_maxy + dy)
+
+from urllib.parse import urlparse, urlunparse, parse_qsl, urlencode
+
+def bbox_intersection(a, b):
+    min_x = max(a[0], b[0])
+    min_y = max(a[1], b[1])
+    max_x = min(a[2], b[2])
+    max_y = min(a[3], b[3])
+    if min_x >= max_x or min_y >= max_y:
+        return None
+    return (min_x, min_y, max_x, max_y)
+
+def subtract_bbox(bbox, covered):
+    overlap = bbox_intersection(bbox, covered)
+    if overlap is None:
+        return [bbox]
+
+    bx1, by1, bx2, by2 = bbox
+    ox1, oy1, ox2, oy2 = overlap
+    fragments = []
+
+    if bx1 < ox1:
+        fragments.append((bx1, by1, ox1, by2))
+    if ox2 < bx2:
+        fragments.append((ox2, by1, bx2, by2))
+    if by1 < oy1:
+        fragments.append((ox1, by1, ox2, oy1))
+    if oy2 < by2:
+        fragments.append((ox1, oy2, ox2, by2))
+
+    return fragments
+
+def replace_bbox(url, bbox):
+    parsed = urlparse(url)
+    params = parse_qsl(parsed.query, keep_blank_values=True)
+    bbox_value = ",".join(f"{coord:g}" for coord in bbox)
+    updated = []
+    replaced = False
+
+    for key, value in params:
+        if key == "bbox" and not replaced:
+            updated.append((key, bbox_value))
+            replaced = True
+        elif key != "bbox":
+            updated.append((key, value))
+
+    if not replaced:
+        updated.append(("bbox", bbox_value))
+
+    return urlunparse(parsed._replace(query=urlencode(updated)))
+
+def bbox_contains(container, contained):
+    if container is None:
+        return True
+    if contained is None or len(container) != 4 or len(contained) != 4:
+        return False
+    return (
+        container[0] <= contained[0]
+        and container[1] <= contained[1]
+        and container[2] >= contained[2]
+        and container[3] >= contained[3]
+    )
+
+def parse_bbox(value):
+    try:
+        min_x, min_y, max_x, max_y = (float(part) for part in value.split(','))
+    except (TypeError, ValueError):
+        return None
+    if min_x >= max_x or min_y >= max_y:
+        return None
+    return (min_x, min_y, max_x, max_y)
