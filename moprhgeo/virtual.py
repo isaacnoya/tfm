@@ -1,5 +1,5 @@
 from classes import *
-from utils import get_invariant, getBaseURL, merge_urls
+from utils import get_invariant, getBaseURL, merge_urls, normalize_hierarchical_data
 from geoFunctions import getBbox, bbox_contains
 
 import copy
@@ -339,7 +339,7 @@ def materializeGroup(ctx, mappings, suj, queriesMade):
         if isinstance(mappings[0].s, Reference):
             template = mappings[0].s
             refs = re.findall(r"\{(.*?)\}", template)
-            values_per_ref = [JSONPath(ref).parse(r) for ref in refs]
+            values_per_ref = [JSONPath(mappings[0].iterator + "." + ref).parse(r) for ref in refs]
             r_subj = []
             for vals in zip(*values_per_ref):  # empareja 1 a 1
                 result = template
@@ -348,26 +348,47 @@ def materializeGroup(ctx, mappings, suj, queriesMade):
                 r_subj.append(result)
         else:
             r_subj=mappings[0].s
+            refs = []
 
         for m in mappings: 
-            if isinstance(m.o, Reference) and not has_filter(m.o):
-                r_obj = JSONPath(m.o).parse(r) 
+            if isinstance(m.o, Reference) and not has_filter(m.o) and not getattr(m, "parentIterator", None):
+                r_obj = JSONPath(m.iterator + "." + m.o).parse(r) 
                 r_subj = [mappings[0].s for _ in r_obj] if isinstance(mappings[0].s, URIRef) else r_subj # In case subject is a constant, r_subj and r_obj must be same size in order to zip correctly
                 for sujeto, objeto in zip(r_subj, r_obj):
                     ctx.graph.add((URIRef(sujeto), URIRef(m.p), Literal(objeto)))
-            elif isinstance(m.o, Reference) and has_filter(m.o):    # caso ad hoc para referencias con filtro, poco general
-                join_key = refs[0].split('.')[-1]
-                entries = JSONPath("$.*").parse(r)
+            elif isinstance(m.o, Reference) and has_filter(m.o) and not getattr(m, "parentIterator", None):    
+                join_key = refs[0]
+                entries = JSONPath(m.iterator).parse(r)
                 lookup_data = {item.get(join_key): item for item in entries if item.get(join_key)}
                 column_value = []
                 for key_value in values_per_ref[0]:
                     match = lookup_data.get(key_value)
                     if match:
-                        res = JSONPath(f"$.{m.o.removeprefix('$.*.')}").parse(match)
+                        res = JSONPath(f"$.{m.o}").parse(match)
                         ctx.graph.add((URIRef(template.replace(f"{{{refs[0]}}}", str(key_value))), URIRef(m.p), Literal(res[0]))) if res else None
                     else:
                         column_value.append(None)
+            elif isinstance(m.o, Reference) and getattr(m, "parentIterator", None): #parentTripleMaps logic adhoc to use case
+                # if subject is a constant it might not work
+                refObj = re.findall(r"\{(.*?)\}", m.o)[0]
+                references = refs + [refObj]
 
+                jsonpath_expression = m.iterator + '.('
+                for reference in references: 
+                    jsonpath_expression += reference.split('.')[0] + ','
+                jsonpath_expression = jsonpath_expression[:-1] + ')'
+
+                jsonpath_result = JSONPath(jsonpath_expression).parse(r)
+                json_df = pd.json_normalize([json_object for json_object in normalize_hierarchical_data(jsonpath_result) if
+                                 None not in json_object.values()])
+
+                json_df = json_df[[c.replace('*.', '') for c in references if c.replace('*.', '') in json_df.columns]]
+
+                for index, row in json_df.iterrows():
+                    subj = m.s
+                    for reference in refs:
+                        subj = subj.replace(f"{{{reference}}}", str(row[reference.replace('*.', '')]))
+                    ctx.graph.add((URIRef(subj), URIRef(m.p), URIRef(m.o.replace(f"{{{refObj}}}", str(row[refObj.replace('*.', '')])))))            
             elif isinstance(m.o, URIRef): # Object is a constant URI, not a Reference
                 if isinstance(mappings[0].s, Reference):
                     for sujeto in r_subj:
@@ -410,14 +431,15 @@ def orderTriplesStatic(ctx, triples) -> list:
     def score_grupo(triples_grupo):
         score = 0
         for t in triples_grupo:
+            score += 1
             obj = t[2]
             if type(obj) is rdflib.term.Literal:
-                score += 1
+                score += 10
             geoBind = geoBindings.get(obj, None)
-            if type(geoBind) is Variable:
-                score -= 5
-            if type(geoBind) is rdflib.term.Literal:
-                score += 5
+            if geoBind is not None:
+                score += 20
+                if any(isinstance(x, rdflib.term.Literal) for x in geoBind):
+                    score += 10
         return score
 
     grupos_con_score = [

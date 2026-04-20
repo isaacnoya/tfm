@@ -21,14 +21,14 @@ from geoFunctions import GEOF_SFCONTAINS, geof_sfContains, GEOF_DISTANCE, geof_d
 
 EX = Namespace("http://example.com/")
 
-
 mappings = getMappingsFromTxT("/Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/moprhgeo/mappings.txt")
 
 """
 #TODO:  
-    -Implementar parentTriplesMap (aqui voy a tener que modificar el materializaGroup porque no contemplo que el objeto sea un Template)
     -Solucionar lo de la coordenada de referencia (ns q es), mirar https://pypi.org/project/pyproj/
-    -en QueriesMade, tambien tener en cuenta si se ha hecho la misma consulta pero con un bbox que contenga plenamente al bbox a consultar.
+    -mejorar visualizacion
+    -Mejorar compatibleMapping como en Query-Specific Pruning of RML Mappings.
+
 
 +++ Query-Specific Pruning of RML Mappings:
     -Puedo implementar el prunning al principio? ns si servira de algo, porque despues ya hago el select mapping
@@ -44,6 +44,8 @@ Optimizaciones implementadas (para acordarme):
     -Bindings geo con void:bbox
     -Objetos literales + void:filter
     -queriesMade teniendo en cuenta el bbox (si se ha hecho la misma consulta pero con un bbox que contenga plenamente al bbox a consultar, no hace falta hacer la consulta), si no se overlapean al completo, saca los fragmentos.
+Assumptions:
+    -El join de los parentTriplesMap no se hace, sencillamente se evalua el subject template del padre en el child.
 """
 
 def virtual_bgp_eval(ctx: QueryContext, part) -> Generator[FrozenBindings, None, None]:
@@ -168,9 +170,9 @@ def virtualGeoFilter(ctx: QueryContext, part) -> Generator[FrozenBindings, None,
             return
 
         if iri == GEOF_SFCONTAINS:
-            _append_contains(args[0], args[1])
+            _append_contains_bi(args[0], args[1])
         elif iri == GEOF_WITHIN:
-            _append_contains(args[1], args[0])
+            _append_contains_bi(args[1], args[0])
         elif iri == GEOF_INTESECT or iri == GEOF_OVERLAPS or iri == GEOF_CROSSES:
             _append_contains_bi(args[0], args[1])
         elif iri == GEOF_DISTANCE:
@@ -239,37 +241,42 @@ register_custom_function(GEOF_OVERLAPS, geof_overlaps)
 register_custom_function(GEOF_CROSSES, geof_crosses)
 
 import rdflib
-g = rdflib.Graph()
+if __name__ == "__main__":
+    g = rdflib.Graph()
 
 
-query = """
-PREFIX ogc: <http://www.ogc.org/>
-PREFIX ine: <https://lod.ine.es/voc/cubes/vocabulary#>
-PREFIX sdmx-measure: <http://purl.org/linked-data/sdmx/2009/measure#>
-PREFIX sdmx-dimension: <http://purl.org/linked-data/sdmx/2009/dimension#>
-PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
-PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
-PREFIX ex: <http://example.org/function/>
-PREFIX qb: <http://purl.org/linked-data/cube#>
+    query = """
+    PREFIX ogc: <http://www.ogc.org/>
+    PREFIX ine: <http://lod.ine.es/def/vocabulary/>
+    PREFIX sdmx-measure: <http://purl.org/linked-data/sdmx/2009/measure#>
+    PREFIX sdmx-dimension: <http://purl.org/linked-data/sdmx/2009/dimension#>
+    PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+    PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
+    PREFIX ex: <http://example.com/>
+    PREFIX qb: <http://purl.org/linked-data/cube#>
 
-SELECT ?w ?t ?dist WHERE {
-    ?s a ogc:administrativeunit ;
-       ogc:nameunit "Santiago de Compostela" ;
-       geo:hasGeometry ?gs .
+    SELECT ?obsValue ?n ?year WHERE {
+        ?o a qb:Observation ;
+            sdmx-measure:obsValue ?obsValue ;
+            qb:slice ?slice ;
+            sdmx-dimension:year ?year .
+        ?slice ine:municipality ?n ;
+            sdmx-dimension:sex "Total" .
 
-    ?w a ogc:standingwater ;
-        geo:hasGeometry ?gw .
+        ?s a ogc:administrativeunit ;
+            ogc:nameunit ?n ;
+            geo:hasGeometry ?gs .
+        
+        ?t a ogc:railwaystationnode ;
+            geo:hasGeometry ?gt ;
+            ogc:nombre "Estación de Casal" .
 
-    ?t a ogc:watercourselinksequence ;
-        geo:hasGeometry ?gt .
-    
-    FILTER (geof:sfWithin(?gw, ?gs))
-    FILTER (geof:sfWithin(?gt, ?gs))
-    FILTER (geof:sfDistance(?gw, ?gt) < 5000)
-}
-"""
 
-qres = g.query(query)
-for r in qres:
-    print(r)
-    pass
+        FILTER(geof:sfContains(?gs, ?gt))
+    }
+    """
+
+    qres = g.query(query)
+    for r in qres:
+        print(r)
+        pass

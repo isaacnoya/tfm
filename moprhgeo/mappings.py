@@ -11,7 +11,7 @@ def get_compatible_mappings(pattern, mappings):
     compatible_mappings = []
     for mapping in mappings:
         if is_compatible(pattern, mapping):
-            compatible_mappings.append(mapping)
+            compatible_mappings.append(mapping) 
     return compatible_mappings
 
 
@@ -59,7 +59,59 @@ def getMappings(mapping_file):
     mrules = []
     for m in mappings.query(mappingRuleQuery):
         vb = VirtualMapping(*m)
-        mrules.append(vb)
+        mrules.append(vb) if vb.o is not None else None
+
+    mappingsParentTPQuery = prepareQuery("""
+    PREFIX rml: <http://w3id.org/rml/>
+    PREFIX htv: <http://www.w3.org/2011/http#>
+    PREFIX void: <http://rdfs.org/ns/void#> 
+
+    SELECT ?subject ?predicate ?object ?reference ?url ?iterator ?nextPage ?childJoinCond ?parentJoinCond ?parentURL ?parentIterator WHERE {
+        ?tm a rml:TriplesMap ;
+            rml:logicalSource ?ls ;
+            rml:predicateObjectMap ?pom .
+        ?ls rml:source ?source ;
+            rml:iterator ?iterator .
+                                         
+        ?source htv:absoluteURI ?url .
+        ?pom rml:predicate ?predicate .
+                                         
+        ?tm rml:subjectMap ?sm .
+        OPTIONAL {
+            ?sm rml:template ?subject .
+        } .
+        OPTIONAL {
+            ?sm rml:constant ?subject .
+        } .
+        ?pom rml:objectMap ?om .
+        ?om rml:joinCondition ?joinCondition .
+        OPTIONAL {
+        ?joinCondition rml:child ?childJoinCond .
+        ?joinCondition rml:parent ?parentJoinCond .
+        } .
+                                         
+        ?om rml:parentTriplesMap ?parentTM .
+        ?parentTM rml:subjectMap ?parentSM .
+        OPTIONAL {
+            ?parentSM rml:template ?object .
+        } .
+        OPTIONAL {
+            ?parentSM rml:constant ?object .
+        } .
+        ?parentTM rml:logicalSource ?parentLS .
+        ?parentLS rml:source ?parentSource ;
+            rml:iterator ?parentIterator .
+        ?parentSource htv:absoluteURI ?parentURL                              
+                                        
+ .
+    }
+    """)
+    for m in mappings.query(mappingsParentTPQuery):
+        s, p, o, ref, url, iterator, nextPage, childJoinCond, parentJoinCond, parentURL, parentIterator = m
+        vb = VirtualMapping(s, p, o, ref, url, iterator, nextPage)
+        vb.setParentTriplesMapInfo(childJoinCond, parentJoinCond, parentURL, parentIterator)
+        mrules.append(vb) if vb.o is not None else None
+                                         
     return mrules
 
 def getMappingsFromTxT(file_name):

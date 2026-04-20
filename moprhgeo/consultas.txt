@@ -344,3 +344,56 @@ SELECT ?w ?nt ?dist WHERE {
     FILTER (geof:sfWithin(?gt, ?gs))
     BIND (geof:sfDistance(?gw, ?gt) AS ?dist)
 }
+
+SELECT ?w WHERE {
+    ?s a ogc:administrativeunit ;
+       ogc:nameunit "Galicia" ;
+       geo:hasGeometry ?gs .
+
+    ?w a ogc:wetland ;
+        geo:hasGeometry ?gw .
+    
+    FILTER (geof:sfWithin(?gw, ?gs))
+}
+
+SELECT ?obsValue WHERE {
+    ?o a qb:Observation ;
+        sdmx-measure:obsValue ?obsValue ;
+        sdmx-dimension:year "2025" ;
+        qb:slice ?slice .
+    ?slice ine:municipality ?n ;
+        sdmx-dimension:sex "Total" .
+    }
+
+    SELECT ?obsValue ?n ?year WHERE {
+        ?o a qb:Observation ;
+            sdmx-measure:obsValue ?obsValue ;
+            qb:slice ?slice ;
+            sdmx-dimension:year ?year .
+        ?slice ine:municipality ?n ;
+            sdmx-dimension:sex "Total" .
+
+        ?s a ogc:administrativeunit ;
+            ogc:nameunit ?n ;
+            geo:hasGeometry ?gs .
+        
+        ?t a ogc:railwaystationnode ;
+            geo:hasGeometry ?gt ;
+            ogc:nombre "Estación de Casal" .
+
+
+        FILTER(geof:sfContains(?gs, ?gt))
+    }
+
+
+
+/Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/mapama-features/mappings/agua:estado_masas_aguasub_mapping.ttl
+/Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/idee-features/mappings/railwaystationnode_mapping.ttl
+/Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/LinkedOpenDataINE/autogenAPI/mappings/50902/50902_det0_tip_mappings.rml.ttl
+/Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/idee-features/mappings/railwaylink_mapping.ttl
+/Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/idee-features/mappings/standingwater_mapping.ttl
+/Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/ign-features/mappings/administrativeunit_mapping.ttl
+/Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/idee-features/mappings/watercourselinksequence_mapping.ttl
+/Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/idee-features/mappings/wetland_mapping.ttl
+/Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/ineAPI/25171_det0_tip_mappings.rml.ttl
+/Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/pygeoapi/mappings/lakes_mapping.ttl
