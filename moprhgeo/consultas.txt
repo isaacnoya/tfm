@@ -399,6 +399,19 @@ SELECT ?w ?t WHERE {
 LIMIT 10
 
 
+SELECT ?x ?gx ?y ?gy WHERE {
+        ?x a ogc:agua:Zi_arpsi ;
+        geo:hasGeometry ?gx .
+    ?y a ogc:railwaystationnode ;
+        geo:hasGeometry ?gy .
+    ?g a ogc:administrativeunit ;
+        ogc:nameunit "Galicia" ;
+        geo:hasGeometry ?gg .
+    FILTER(geof:sfDistance(?gy, ?gx) < 1000) 
+    FILTER(geof:sfContains(?gg, ?gx))
+}
+LIMIT 10
+
 
 /Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/mapama-features/mappings/agua:estado_masas_aguasub_mapping.ttl
 /Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/idee-features/mappings/railwaystationnode_mapping.ttl

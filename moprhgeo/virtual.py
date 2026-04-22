@@ -279,7 +279,10 @@ def injectBindings(ctx, url):
                 nuevo_valor = value.replace(match.group(0), str(valor_ctx)) 
                 nuevos_params.append((key, nuevo_valor))
             elif len(geoBindings_value) and all(v[0] is not None for v in geoBindings_value):
-                nuevo_valor = value.replace(match.group(0), getBbox(geoBindings_value))
+                newbbox = getBbox(geoBindings_value)
+                if newbbox is None: # bbox intersection was empty, no need to query as it will not return any result
+                    return None
+                nuevo_valor = value.replace(match.group(0), str(newbbox)) 
                 nuevos_params.append((key, nuevo_valor))
         else:
             nuevos_params.append((key, value))
@@ -322,7 +325,7 @@ def materializeGroup(ctx, mappings, suj, queriesMade):
     url_next = merge_urls([m.source for m in mappings])
     url_next = injectBindings(ctx, url_next)
     
-    if querieMade(queriesMade, url_next, suj):
+    if url_next is None or querieMade(queriesMade, url_next, suj):
         return ctx
 
     while url_next:

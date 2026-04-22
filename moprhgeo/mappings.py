@@ -124,7 +124,7 @@ def getMappingsFromTxT(file_name):
                     rules = getMappings(mapping_file)
                     all_rules.extend(rules)                    
     except FileNotFoundError:
-        print(f"Error: No se encontró el archivo de rutas en {file_name}")
+        print(f"Error: No se encontró el archivo de rutas en {mapping_file}")
     except Exception as e:
         print(f"Ocurrió un error inesperado: {e}")
         

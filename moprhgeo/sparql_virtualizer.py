@@ -26,6 +26,7 @@ mappings = getMappingsFromTxT("/Users/kekojohns/Library/CloudStorage/OneDrive-Pe
 """
 #TODO:  
     -Buscar caso de uso
+    -Hacer un selectNextSubQuery dinamico
     -Mejorar compatibleMapping como en Query-Specific Pruning of RML Mappings ?
 
 
@@ -254,14 +255,19 @@ if __name__ == "__main__":
     PREFIX ex: <http://example.com/>
     PREFIX qb: <http://purl.org/linked-data/cube#>
 
-    SELECT ?x WHERE {
-        ?x a ogc:clms_ba_global_300m_monthly_v4_cog ;
-            geo:hasGeometry ?geom1 .
-        ?y a ogc:administrativeunit ;
+    SELECT ?x ?ny WHERE {
+        ?x a ogc:agua:Zi_arpsi ;
+            geo:hasGeometry ?gx .
+        ?y a ogc:railwaystationnode ;
+            geo:hasGeometry ?gy ;
+            ogc:nombre ?ny .
+        ?g a ogc:administrativeunit ;
             ogc:nameunit "Galicia" ;
-            geo:hasGeometry ?geom2 ;
-        FILTER(geof:sfContains(?geom2, ?geom1)) 
+            geo:hasGeometry ?gg .
+        FILTER(geof:sfDistance(?gy, ?gx) < 1000) 
+        FILTER(geof:sfContains(?gg, ?gx))
     }
+    LIMIT 50
 
     """
 
