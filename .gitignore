@@ -14,3 +14,4 @@ OGCmappingGenerator/.env
 moprhgeo/mappings.txt
 .vscode/*
 .vscode
+.DS_Store
