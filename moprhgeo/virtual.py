@@ -328,7 +328,7 @@ def materializeGroup(ctx, mappings, suj, queriesMade):
     while url_next:
         try:
             r = requests.get(url_next).json()
-            #print(url_next)
+            print(url_next)
         except:
             r = {} 
         #Podemos usar mappings[0] porque todos los mappings comparten sujeto?

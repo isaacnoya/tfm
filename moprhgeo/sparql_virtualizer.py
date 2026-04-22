@@ -26,9 +26,7 @@ mappings = getMappingsFromTxT("/Users/kekojohns/Library/CloudStorage/OneDrive-Pe
 """
 #TODO:  
     -Buscar caso de uso
-    -Solucionar lo de la coordenada de referencia (ns q es), mirar https://pypi.org/project/pyproj/
-    -mejorar visualizacion
-    -Mejorar compatibleMapping como en Query-Specific Pruning of RML Mappings.
+    -Mejorar compatibleMapping como en Query-Specific Pruning of RML Mappings ?
 
 
 +++ Query-Specific Pruning of RML Mappings:
@@ -256,21 +254,15 @@ if __name__ == "__main__":
     PREFIX ex: <http://example.com/>
     PREFIX qb: <http://purl.org/linked-data/cube#>
 
-    SELECT ?w ?t WHERE {
-        ?s a ogc:administrativeunit ;
+    SELECT ?x WHERE {
+        ?x a ogc:clms_ba_global_300m_monthly_v4_cog ;
+            geo:hasGeometry ?geom1 .
+        ?y a ogc:administrativeunit ;
             ogc:nameunit "Galicia" ;
-            geo:hasGeometry ?gs .
-
-        ?w a <http://www.ogc.org/agua:Zi_arpsi> ;
-            geo:hasGeometry ?gw .
-
-        ?t a ogc:damorweir ;
-            geo:hasGeometry ?gt .
-        
-        FILTER (geof:sfWithin(?gw, ?gs))
-        FILTER (geof:sfWithin(?gt, ?gs))
-        FILTER (geof:sfDistance(?gw, ?gt) < 5000)
+            geo:hasGeometry ?geom2 ;
+        FILTER(geof:sfContains(?geom2, ?geom1)) 
     }
+
     """
 
     qres = g.query(query)

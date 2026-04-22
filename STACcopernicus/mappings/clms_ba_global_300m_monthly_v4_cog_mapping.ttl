@@ -24,7 +24,7 @@ ogc:clms_ba_global_300m_monthly_v4_cogTriplesMap a rml:TriplesMap ;
                     rml:reference "geometry_name" ] ;
             rml:predicate ogc:geometryName ] ;
     rml:subjectMap [ rml:class ogc:clms_ba_global_300m_monthly_v4_cog ;
-            rml:template "https://stac.dataspace.copernicus.eu/v1//collections/clms_ba_global_300m_monthly_v4_cog/items/{id}" ] .
+            rml:template "https://stac.dataspace.copernicus.eu/v1/collections/clms_ba_global_300m_monthly_v4_cog/items/{id}" ] .
 
 ogc:LogicalSource_clms_ba_global_300m_monthly_v4_cog a rml:logicalSource ;
     void:nextPage "$.links[?(@.rel==\"next\")].href" ;

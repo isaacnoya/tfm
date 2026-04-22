@@ -59,15 +59,16 @@ PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
 PREFIX geof: <http://www.opengis.net/def/function/geosparql/>
 PREFIX ex: <http://example.org/function/>
 
-SELECT ?n ?dist WHERE {
-    ?x a ogc:railwaystationnode ;
-        ogc:nombre "Apartadero de Padrón Barbanza" .
-    ?y a ogc:railwaystationnode ;
-        geo:hasGeometry ?geom2 ;
-        ogc:nombre ?n .
-    BIND(geof:distance(?geom1, ?geom2) AS ?dist)
-    FILTER(?dist < 10000) # Lugares a menos de 5km
-  }
+    SELECT ?n ?dist WHERE {
+        ?x a ogc:railwaystationnode ;
+            ogc:nombre "Estación de Casal" ;
+            geo:hasGeometry ?geom1 .
+        ?y a ogc:railwaystationnode ;
+            geo:hasGeometry ?geom2 ;
+            ogc:nombre ?n .
+        BIND(geof:sfDistance(?geom1, ?geom2) AS ?dist)
+        FILTER(geof:sfDistance(?geom1, ?geom2) < 10000) # Lugares a menos de 5km
+    }
 
 PREFIX ogc: <http://www.ogc.org/>
 PREFIX ine: <https://stats.linkeddata.es/voc/cubes/obs/>
@@ -83,7 +84,7 @@ SELECT ?y ?dist WHERE {
         ogc:nombre "Estación de Casal" .
     ?y a ogc:railwaylink ;
         geo:hasGeometry ?geom2 .
-    BIND(geof:distance(?geom1, ?geom2) AS ?dist)
+    BIND(geof:sfDistance(?geom1, ?geom2) AS ?dist)
     FILTER(?dist < 10000) # Lugares a menos de 5km
   }
 
@@ -105,8 +106,8 @@ SELECT DISTINCT ?ny ?nz WHERE {
     ?z a ogc:railwaystationnode ;
         geo:hasGeometry ?geom3 ;
         ogc:nombre ?nz .
-    BIND(geof:distance(?geom1, ?geom2) AS ?dist)
-    BIND(geof:distance(?geom3, ?geom2) AS ?dist2)
+    BIND(geof:sfDistance(?geom1, ?geom2) AS ?dist)
+    BIND(geof:sfDistance(?geom3, ?geom2) AS ?dist2)
     FILTER(?dist < 10000 && ?dist2 < 10000) 
   }
 
@@ -131,7 +132,7 @@ SELECT ?a ?na WHERE {
         ogc:nom_masa ?na .
 
     FILTER ( geof:sfContains(?geom3, ?geom2) && ?dist < 10000)
-    BIND(geof:distance(?geom1, ?geom2) AS ?dist)
+    BIND(geof:sfDistance(?geom1, ?geom2) AS ?dist)
   }
 
 PREFIX ogc: <http://www.ogc.org/>
@@ -365,25 +366,37 @@ SELECT ?obsValue WHERE {
         sdmx-dimension:sex "Total" .
     }
 
-    SELECT ?obsValue ?n ?year WHERE {
-        ?o a qb:Observation ;
-            sdmx-measure:obsValue ?obsValue ;
-            qb:slice ?slice ;
-            sdmx-dimension:year ?year .
-        ?slice ine:municipality ?n ;
-            sdmx-dimension:sex "Total" .
+SELECT ?obsValue ?n ?year WHERE {
+    ?o a qb:Observation ;
+        sdmx-measure:obsValue ?obsValue ;
+        qb:slice ?slice ;
+        sdmx-dimension:year ?year .
+    ?slice ine:municipality ?n ;
+        sdmx-dimension:sex "Total" .
+    ?s a ogc:administrativeunit ;
+        ogc:nameunit ?n ;
+        geo:hasGeometry ?gs .
+    
+    ?t a ogc:railwaystationnode ;
+        geo:hasGeometry ?gt ;
+        ogc:nombre "Estación de Casal" .
+    FILTER(geof:sfContains(?gs, ?gt))
+}
 
-        ?s a ogc:administrativeunit ;
-            ogc:nameunit ?n ;
-            geo:hasGeometry ?gs .
-        
-        ?t a ogc:railwaystationnode ;
-            geo:hasGeometry ?gt ;
-            ogc:nombre "Estación de Casal" .
-
-
-        FILTER(geof:sfContains(?gs, ?gt))
-    }
+SELECT ?w ?t WHERE {
+    ?s a ogc:administrativeunit ;
+        ogc:nameunit "Galicia" ;
+        geo:hasGeometry ?gs .
+    ?w a <http://www.ogc.org/agua:Zi_arpsi> ;
+        geo:hasGeometry ?gw .
+    ?t a ogc:damorweir ;
+        geo:hasGeometry ?gt .
+    
+    FILTER (geof:sfWithin(?gw, ?gs))
+    FILTER (geof:sfWithin(?gt, ?gs))
+    FILTER (geof:sfDistance(?gw, ?gt) < 5000)
+} 
+LIMIT 10
 
 
 

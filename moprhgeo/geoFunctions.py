@@ -3,6 +3,7 @@ from rdflib import URIRef, Literal
 from shapely import wkt
 from shapely.geometry import shape
 from geopy.distance import geodesic
+from pyproj import CRS, Geod
 
 GEOF_SFCONTAINS = URIRef(
     "http://www.opengis.net/def/function/geosparql/sfContains"
@@ -57,23 +58,57 @@ def getBbox(geoms: list):
     return f"{minx},{miny},{maxx},{maxy}"
 
 def parse_geom(g):
+    geom, _ = parse_geom_and_crs(g)
+    return geom
+
+
+def parse_geom_and_crs(g):
 
     g = g.toPython() if type(g) is not str else g
+    crs = None
 
     if isinstance(g, dict):   # GeoJSON dict
-        return shape(g)
+        crs = _extract_geojson_crs(g)
+        return shape(g), crs
 
     if isinstance(g, str):
 
         g = g.strip()
 
+        if g.upper().startswith("SRID="):
+            srid, g = g.split(";", 1)
+            crs = _parse_crs_value(srid[5:])
+
         if g.startswith("{"):   # GeoJSON string
-            return shape(json.loads(g))
+            geojson = json.loads(g)
+            crs = _extract_geojson_crs(geojson) or crs
+            return shape(geojson), crs
 
         else:                   # WKT
-            return wkt.loads(g)
+            return wkt.loads(g), crs
 
     raise ValueError("Unknown geometry format")
+
+
+def _extract_geojson_crs(geojson):
+    crs_obj = geojson.get("crs")
+    if not isinstance(crs_obj, dict):
+        return None
+
+    if crs_obj.get("type") == "name":
+        return _parse_crs_value(crs_obj.get("properties", {}).get("name"))
+
+    return None
+
+
+def _parse_crs_value(value):
+    if not value:
+        return None
+
+    try:
+        return CRS.from_user_input(value)
+    except Exception:
+        return None
 
 
 def geof_sfContains(geom1, geom2):
@@ -111,27 +146,25 @@ def geof_crosses(geom1, geom2):
 
     return Literal(g1.crosses(g2))
 
-import math
-def meters_to_degrees(dist_meters, lat_reference):
+_DEFAULT_GEOD = Geod(ellps="WGS84")
+
+def meters_to_degrees(dist_meters, lat_reference, geod=None):
     """
     Convierte una distancia en metros a desplazamientos en grados (offset_x, offset_y).
     lat_reference: Latitud en la que se encuentra la geometría (en grados decimales).
     """
-    # Constante aproximada del radio de la Tierra en metros (WGS84)
-    METERS_PER_DEGREE_LAT = 111111.0
+    lat_reference = max(min(float(lat_reference), 90.0), -90.0)
+    dist_meters = float(dist_meters)
 
-    # 1. El offset en Latitud (Y) es constante
-    offset_y = dist_meters / METERS_PER_DEGREE_LAT
+    if dist_meters == 0:
+        return 0.0, 0.0
 
-    # 2. El offset en Longitud (X) depende de la latitud (se estrecha hacia los polos)
-    # Convertimos la latitud a radianes para la función coseno
-    cos_lat = math.cos(math.radians(lat_reference))
-    
-    # Evitamos división por cero en los polos
-    if abs(cos_lat) < 1e-10:
-        offset_x = 0
-    else:
-        offset_x = dist_meters / (METERS_PER_DEGREE_LAT * cos_lat)
+    geod = geod or _DEFAULT_GEOD
+    lon_east, _, _ = geod.fwd(0.0, lat_reference, 90.0, dist_meters)
+    _, lat_north, _ = geod.fwd(0.0, lat_reference, 0.0, dist_meters)
+
+    offset_x = abs(lon_east)
+    offset_y = abs(lat_north - lat_reference)
 
     return offset_x, offset_y
 
@@ -139,16 +172,20 @@ def get_offset_bounds(g_tuple):
     geom_raw, dist_m = g_tuple
     dist_m = float(dist_m) if dist_m else 0
     # Obtenemos los límites originales en grados
-    b_minx, b_miny, b_maxx, b_maxy = parse_geom(geom_raw).bounds
+    geom, crs = parse_geom_and_crs(geom_raw)
+    b_minx, b_miny, b_maxx, b_maxy = geom.bounds
     
     if dist_m == 0:
         return (b_minx, b_miny, b_maxx, b_maxy)
 
-    # Calculamos la latitud media para ajustar la deformación del eje X
+    if crs is not None and crs.is_projected:
+        unit_factor = crs.axis_info[0].unit_conversion_factor or 1.0
+        delta = dist_m / unit_factor
+        return (b_minx - delta, b_miny - delta, b_maxx + delta, b_maxy + delta)
+
     lat_media = (b_miny + b_maxy) / 2
-    
-    # Obtenemos los offsets en grados
-    dx, dy = meters_to_degrees(dist_m, lat_media)
+    geod = crs.get_geod() if crs is not None and crs.is_geographic else _DEFAULT_GEOD
+    dx, dy = meters_to_degrees(dist_m, lat_media, geod)
 
     # Aplicamos el margen (Buffer)
     return (b_minx - dx, b_miny - dy, b_maxx + dx, b_maxy + dy)
