@@ -3,6 +3,9 @@ import json
 from groq import Groq
 from dotenv import load_dotenv
 import requests
+from rdflib import Namespace, Literal, BNode, URIRef
+
+DBO = Namespace("http://dbpedia.org/ontology/")
 
 load_dotenv()
     
@@ -96,19 +99,124 @@ def buscar_dbpedia_label(label):
     return None
 
 # Ejemplos de uso
-if __name__ == "__main__":
-    term = ["component_AddressAreaName", "property"]
-    if not (result:= buscar_dbpedia_label(term[0])):
-        print(f"La clase '{term[0]}' no existe en DBpedia, buscando con LLM...")
-        result = searchLLM(term[0], type=term[1])
-        print("Resultado:", result)
-        # Comprobar si existe la entidad "Douglas Adams" (Q42)
-        print(f"¿Existe {result['wikidata_qid']} en Wikidata?: {existe_en_wikidata(result['wikidata_qid'])}")
+def searchNotLocal(term, description="", type="class"):
+    if not (result:= buscar_dbpedia_label(term)):
+        result = searchLLM(term, type=type, description=description)
         
         dbpedia_resource = result['dbpedia_uri'].split('/')[-1] if result['dbpedia_uri'] else None
-        # Comprobar si existe la clase "City" en la ontología de DBpedia
-        print(f"¿Existe {dbpedia_resource} en DBpedia?: {existe_en_dbpedia(dbpedia_resource)}")
-    else:
-        print(f"La clase '{term[0]}' ya existe en DBpedia con URI: {result}")
 
+        if existe_en_dbpedia(dbpedia_resource) and existe_en_wikidata(result['wikidata_qid']):
+            return DBO[dbpedia_resource]
+        else:
+            return None
+    else:
+        return result
+
+import torch
+from owlready2 import *
+from sentence_transformers import SentenceTransformer, util
+
+class VectorialOntologyMatcher:
+    def __init__(self, owl_paths, index_cache="onto_index.pt"):
+        self.model = SentenceTransformer('paraphrase-multilingual-MiniLM-L12-v2')
+        self.cache_path = index_cache
+        
+        self.entity_uris = []
+        self.entity_metadata = []
+        self.ontology_embeddings = None
+        
+        # Cargamos todas las ontologías en el mismo mundo
+        self.ontos = []
+        for path in owl_paths:
+            self.ontos.append(get_ontology(path).load())
+
+        if os.path.exists(self.cache_path):
+            self._load_index()
+        else:
+            self._build_index()
+
+    def _get_entity_text(self, entity, entity_type):
+        """Extrae texto representativo de cualquier entidad OWL."""
+        label = entity.label.first() if entity.label else ""
+        comment = entity.comment.first() if entity.comment else ""
+        # Añadimos el tipo de entidad al texto para dar contexto al modelo
+        return f"{entity_type}: {entity.name}. Etiqueta: {label}. Descripción: {comment}".strip()
+
+    def _build_index(self):
+        """Codifica clases, propiedades de objeto y de datos."""
+        print(f"Indexando entidades de {self.onto.name}...")
+        all_texts = []
+        
+        # Recopilamos Clases, ObjectProperties y DataProperties
+        entities_to_index = [
+            (list(self.onto.classes()), "Clase"),
+            (list(self.onto.object_properties()), "Propiedad de Objeto"),
+            (list(self.onto.data_properties()), "Propiedad de Datos")
+        ]
+
+        for onto in self.ontos:
+            entities_to_index = [
+                (list(onto.classes()), "Clase"),
+                (list(onto.object_properties()), "Propiedad de Objeto"),
+                (list(onto.data_properties()), "Propiedad de Datos")
+            ]
+
+            for entities, e_type in entities_to_index:
+                for e in entities:
+                    text = self._get_entity_text(e, e_type)
+                    all_texts.append(text)
+                    self.entity_uris.append(str(e.iri)) 
+                    self.entity_metadata.append({
+                        "name": e.name, 
+                        "type": e_type,
+                        "ontology": onto.name
+                    })
+        
+        self.ontology_embeddings = self.model.encode(all_texts, convert_to_tensor=True)
+
+        torch.save({
+            'embeddings': self.ontology_embeddings,
+            'uris': self.entity_uris,
+            'metadata': self.entity_metadata
+        }, self.cache_path)
+    
+    def _load_index(self):
+        print("Cargando índice desde cache...")
+        data = torch.load(self.cache_path, weights_only=False) 
+        self.ontology_embeddings = data['embeddings']
+        self.entity_uris = data['uris']
+        self.entity_metadata = data['metadata']
+
+    def search(self, name, description, top_k=1):
+        """Busca en el espacio vectorial y devuelve los más cercanos."""
+        query_text = f"{name}: {description}"
+        query_embedding = self.model.encode(query_text, convert_to_tensor=True)
+
+        hits = util.semantic_search(query_embedding, self.ontology_embeddings, top_k=top_k)[0]
+
+        results = []
+        if hits[0]['score'] > 0.7:  # Umbral de confianza
+            idx = hits[0]['corpus_id']
+
+            return {
+                "iri": self.entity_uris[idx],
+                "type": self.entity_metadata[idx]['type'],
+                "name": self.entity_metadata[idx]['name'],
+                "confidence": round(hits[0]['score'], 4)
+            }
+        else:
+            return None
+    
+if __name__ == "__main__":
+    oe = VectorialOntologyMatcher(["/Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/ontologiasReferencia/hydrOntology_GeoLinkedData.owl"])
+    title = "HY-P Cruce"
+    description = "Objeto artificial que permite el paso del agua por encima o por debajo de un obstáculo. Puede ser de tipo acueducto, puente, alcantarilla o sifón."
+    resultado = oe.search(title, description)
+    if resultado:
+        sameAs = resultado['iri']
+    if not resultado:
+        sameAs = searchNotLocal(title, description, "class")
+
+    print(f"Resultado de búsqueda: {sameAs}")
+    pass
 

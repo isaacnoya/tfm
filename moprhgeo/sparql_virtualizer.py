@@ -26,7 +26,12 @@ mappings = getMappingsFromTxT("/Users/kekojohns/Library/CloudStorage/OneDrive-Pe
 """
 #TODO:  
     -Buscar caso de uso
-    -Hacer un selectNextSubQuery dinamico
+    -Meter medidores de tiempo por etapas
+    -El order tiene que ponderar el numero de elementos de la coleccion ?
+
+#POSIBLES MEJORAS:
+    -Hacer un selectNextSubQuery dinamico o
+    -Mejorar el order. Si una geometria depende de otra que tiene mucho score, se deberia de subir mas el score que si depende de una con menos score.
     -Mejorar compatibleMapping como en Query-Specific Pruning of RML Mappings ?
 
 
@@ -44,6 +49,7 @@ Optimizaciones implementadas (para acordarme):
     -Bindings geo con void:bbox
     -Objetos literales + void:filter
     -queriesMade teniendo en cuenta el bbox (si se ha hecho la misma consulta pero con un bbox que contenga plenamente al bbox a consultar, no hace falta hacer la consulta), si no se overlapean al completo, saca los fragmentos.
+    -Lo de los triggers.
 Assumptions:
     -El join de los parentTriplesMap no se hace, sencillamente se evalua el subject template del padre en el child.
 """
@@ -110,7 +116,7 @@ def virtual_bgp_eval3(ctx: QueryContext, part) -> Generator[FrozenBindings, None
         part.triples, key=lambda t: len([n for n in t if ctx[n] is None])
     )
     """
-    triples = orderTriplesStatic(ctx, part.triples)
+    triples, gruposScore = orderTriplesStatic(ctx, part.triples)
     
     for s, p, o in triples:
         tp = TriplePattern(s, p, o)
@@ -122,7 +128,7 @@ def virtual_bgp_eval3(ctx: QueryContext, part) -> Generator[FrozenBindings, None
         mappingsBGP.add(m)    
 
     mappingGroups = getMappingGroups(mappingsBGP)
-    # TODO: optimizeMappingGroups() -> Si 2 grupos de mappings tienen el mismo merged source, igual hay que unificarlos
+    # TO-DO: optimizeMappingGroups() -> Si 2 grupos de mappings tienen el mismo merged source, igual hay que unificarlos
     
     trigers = defaultdict(lambda: None)
     queriesMade = set()
@@ -255,19 +261,15 @@ if __name__ == "__main__":
     PREFIX ex: <http://example.com/>
     PREFIX qb: <http://purl.org/linked-data/cube#>
 
-    SELECT ?x ?ny WHERE {
-        ?x a ogc:agua:Zi_arpsi ;
-            geo:hasGeometry ?gx .
-        ?y a ogc:railwaystationnode ;
-            geo:hasGeometry ?gy ;
-            ogc:nombre ?ny .
-        ?g a ogc:administrativeunit ;
-            ogc:nameunit "Galicia" ;
-            geo:hasGeometry ?gg .
-        FILTER(geof:sfDistance(?gy, ?gx) < 1000) 
-        FILTER(geof:sfContains(?gg, ?gx))
-    }
-    LIMIT 50
+SELECT ?x ?y WHERE {
+    ?x a ogc:railwaystationnode ;
+        geo:hasGeometry ?geom .
+FILTER ( 
+  geof:sfContains(
+    "POLYGON((-9.085693 42.592935, -7.668457 42.592935, -7.668457 43.244952, -9.085693 43.244952, -9.085693 42.592935))"^^geo:wktLiteral, 
+    ?geom)
+   )
+}
 
     """
 

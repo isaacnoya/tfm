@@ -18,7 +18,7 @@ import json
 from shapely.geometry import shape
 from shapely import wkt
 from rdflib import Literal
-
+    
 """
 PyRCC8 1.2.2
 """

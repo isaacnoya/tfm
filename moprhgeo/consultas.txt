@@ -412,6 +412,19 @@ SELECT ?x ?gx ?y ?gy WHERE {
 }
 LIMIT 10
 
+SELECT ?ny ?gy WHERE {
+    ?g a ogc:administrativeunit ;
+        ogc:nameunit "Santiago de Compostela" ;
+        ogc:codnut2 "ES11" ;
+        ogc:country "ES" ;
+        geo:hasGeometry ?gg .
+    ?y a ogc:namedplace ;
+        ogc:etiqueta ?ny ;
+        ogc:tipo "Barrio" ;
+        geo:hasGeometry ?gy .
+    FILTER(geof:sfContains(?gg, ?gy))
+}
+
 
 /Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/mapama-features/mappings/agua:estado_masas_aguasub_mapping.ttl
 /Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/idee-features/mappings/railwaystationnode_mapping.ttl

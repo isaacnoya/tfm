@@ -5,7 +5,7 @@ import rdflib
 from rdflib import Namespace, Literal, BNode, URIRef
 import os
 import tqdm
-#from ontology_searh import ontologySearch
+from ontology_searh import VectorialOntologyMatcher, searchNotLocal
 
 EX = Namespace("http://example.com/")
 HTV = Namespace("http://www.w3.org/2011/http#")
@@ -23,14 +23,16 @@ SKOS = Namespace("http://www.w3.org/2004/02/skos/core#")
 FOAF = Namespace("http://xmlns.com/foaf/0.1/")
 ORG = Namespace("http://www.w3.org/ns/org#")
 VOID = Namespace("http://rdfs.org/ns/void#")
+GEOLINKEDDATA = Namespace("http://geo.linkeddata.es/ontology/")
+DBO = Namespace("http://dbpedia.org/ontology/")
 namespaces = {
     "": EX, "schema": SCHEMA, "rr": RR, "rml": RML, "xsd": XSD,
     "wgs84_pos": WGS84_POS, "rdf": RDF, "rdfs": RDFS, "owl": OWL, "skos": SKOS,"foaf": FOAF, "org": ORG, 
-    "geo": GEO, "ogc": OGC, "htv": HTV, "void": VOID
+    "geo": GEO, "ogc": OGC, "htv": HTV, "void": VOID, "geolinkeddata": GEOLINKEDDATA, "dbo": DBO
 }
 
 class Collection:
-    def __init__(self, id, title, description, spatial, url):
+    def __init__(self, id, title, description, spatial, url, oe: VectorialOntologyMatcher):
         self.id = id
         self.title = title
         self.description = description
@@ -38,6 +40,8 @@ class Collection:
         self.crs = spatial["crs"] if spatial and "crs" in spatial else None
         self.url = url
         self.properties = self._set_properties()
+        self.oe = oe
+        self.sameAs = self.sameAsF()
 
     def _set_properties(self): 
         r = requests.get(self.url+ "/queryables" + "?f=json").json()
@@ -50,6 +54,13 @@ class Collection:
                 "type": v.get("type", "string")  # default to string if type is not provided        
             })
         return l
+    
+    def sameAsF(self):
+        resultado = self.oe.search(self.title, self.description)
+        if resultado:
+            return resultado['iri']
+        if not resultado:
+            return searchNotLocal(self.title, self.description, "class")
 
 
 def add_logical_sources(inputId, urlAPI, ns, g_mappings):
@@ -117,7 +128,7 @@ def add_subject_map_BN(triples_map, g_mappings):
 
 
 
-def get_collections(urlBase):
+def get_collections(urlBase, referenceOntologies=[]):
     try:
         response = requests.get(urlBase+"/collections?f=json")
     except requests.exceptions.RequestException as e:
@@ -131,12 +142,13 @@ def get_collections(urlBase):
             title=c["title"],
             description=c["description"] if "description" in c else None,
             spatial=c["extent"]["spatial"] if "extent" in c and "spatial" in c["extent"] else None,
-            url=urlBase+"/collections/"+c["id"]
+            url=urlBase+"/collections/"+c["id"],
+            oe=oe
         ))
     return collections
 
 
-def generate_ontology(collections, output_ontology):
+def generate_ontology(collections: list[Collection], output_ontology):
     ontology = rdflib.Graph()
     # bindear geosparql y geo al grafo
     ontology.bind("geo", GEO)
@@ -150,6 +162,10 @@ def generate_ontology(collections, output_ontology):
         ontology.add((collection_uri, RDF.type, GEO.FeatureCollection)) 
         ontology.add((class_uri, RDFS.label, Literal(c.title))) 
         ontology.add((collection_uri, RDFS.label, Literal(c.title))) 
+
+        if c.sameAs:
+            ontology.add((class_uri, OWL.sameAs, URIRef(c.sameAs)))
+
         if c.description: 
             ontology.add((class_uri, RDFS.comment, Literal(c.description))) 
         if c.bbox and c.crs: 
@@ -197,14 +213,17 @@ if __name__ == "__main__":
     argparser = argparse.ArgumentParser(description="OGC Mapping Generator")
     argparser.add_argument("OGC_API_URL", help="URL of the Features OGC root endpoint")
     argparser.add_argument("--output_folder", "-o", default="output", help="Output folder name (default: output)")
+    argparser.add_argument("-r", "--rontologias", nargs="+", help="Rutas a los archivos .owl")
 
     args = argparser.parse_args()
     ogc_api_url = args.OGC_API_URL
     os.makedirs(args.output_folder, exist_ok=True)
     output_ontology = args.output_folder + "/ontology.ttl"
 
+    oe = VectorialOntologyMatcher(args.rontologias)
+
     print(f"Fetching collections from OGC API at {ogc_api_url}...")
-    collections = get_collections(ogc_api_url)
+    collections = get_collections(ogc_api_url, oe)
 
     print(f"Generating ontology for {len(collections)} collections...")
     generate_ontology(collections, output_ontology)

@@ -25,7 +25,7 @@ def getMappings(mapping_file):
     PREFIX htv: <http://www.w3.org/2011/http#>
     PREFIX void: <http://rdfs.org/ns/void#> 
 
-    SELECT ?subject ?predicate ?object ?reference ?url ?iterator ?nextPage ?filterx ?projectx WHERE {
+    SELECT ?subject ?predicate ?object ?reference ?url ?iterator ?nextPage ?filterx ?projectx ?limit ?nElements WHERE {
         ?tm a rml:TriplesMap ;
             rml:logicalSource ?ls ;
             rml:predicateObjectMap ?pom .
@@ -48,6 +48,10 @@ def getMappings(mapping_file):
         } .
         OPTIONAL {
                     ?ls void:nextPage ?nextPage
+        } .
+        OPTIONAL {
+                    ?ls void:limit ?limit .
+                    ?ls void:nElements ?nElements .
         } .
         OPTIONAL { ?pom rml:object ?object } .
         OPTIONAL { 

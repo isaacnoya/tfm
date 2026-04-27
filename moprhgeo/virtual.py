@@ -330,8 +330,8 @@ def materializeGroup(ctx, mappings, suj, queriesMade):
 
     while url_next:
         try:
-            r = requests.get(url_next).json()
             print(url_next)
+            r = requests.get(url_next).json()
         except:
             r = {} 
         #Podemos usar mappings[0] porque todos los mappings comparten sujeto?
@@ -434,7 +434,6 @@ def orderTriplesStatic(ctx, triples) -> list:
     def score_grupo(triples_grupo):
         score = 0
         for t in triples_grupo:
-            score += 1
             obj = t[2]
             if type(obj) is rdflib.term.Literal:
                 score += 10
@@ -460,4 +459,4 @@ def orderTriplesStatic(ctx, triples) -> list:
     for sujeto, triples_grupo, _ in grupos_ordenados:
         resultado.extend(triples_grupo)
 
-    return resultado
+    return resultado, grupos_con_score

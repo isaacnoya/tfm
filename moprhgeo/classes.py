@@ -28,7 +28,7 @@ class Template(rdflib.term.Literal):
 
 from urllib.parse import urlparse
 class VirtualMapping:
-    def __init__(self, subject=None, predicate=None, objec=None, reference=None, source=None, iterator=None, nextPage=None, filterx=None, projectx=None):
+    def __init__(self, subject=None, predicate=None, objec=None, reference=None, source=None, iterator=None, nextPage=None, filterx=None, projectx=None, limit=None, nElements=None):
         if subject != None:
             self.s = Reference(subject) if isinstance(subject, rdflib.term.Literal) else subject
         if predicate != None:
@@ -47,6 +47,9 @@ class VirtualMapping:
         self.nextPage = nextPage
         self.filterx = filterx
         self.projectx = projectx
+        self.limit = limit
+        self.nElements = nElements
+
 
     def setParentTriplesMapInfo(self, childJoinCond=None, parentJoinCond=None, parentURL=None, parentIterator=None):
         if parentURL != self.source:
