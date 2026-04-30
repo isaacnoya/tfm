@@ -25,7 +25,7 @@ mappings = getMappingsFromTxT("/Users/kekojohns/Library/CloudStorage/OneDrive-Pe
 
 """
 #TODO:  
-    -Fixear que no filtra si en el FILTER hay una geometria literal
+    -Se podra paralelizar la unificacion?
     -Meter medidores de tiempo por etapas
     -El order tiene que ponderar el numero de elementos de la coleccion ?
 
@@ -33,6 +33,7 @@ mappings = getMappingsFromTxT("/Users/kekojohns/Library/CloudStorage/OneDrive-Pe
     -Hacer un selectNextSubQuery dinamico o
     -Mejorar el order. Si una geometria depende de otra que tiene mucho score, se deberia de subir mas el score que si depende de una con menos score.
     -Mejorar compatibleMapping como en Query-Specific Pruning of RML Mappings ?
+    -Paralelizar sub-consultas independientes.
 
 
 +++ Query-Specific Pruning of RML Mappings:
@@ -263,14 +264,17 @@ if __name__ == "__main__":
     PREFIX dbo: <http://dbpedia.org/ontology/>
     PREFIX geolinkeddata: <http://geo.linkeddata.es/ontology/> 
 
-    SELECT ?x WHERE {
-        ?x a geolinkeddata:Surgencias ;
-            geo:hasGeometry ?geom .
-    FILTER ( 
-    geof:sfContains(
-        "POLYGON((-9.085693 42.592935, -7.668457 42.592935, -7.668457 43.244952, -9.085693 43.244952, -9.085693 42.592935))"^^geo:wktLiteral, 
-        ?geom)
-    )
+    SELECT ?x ?y WHERE {
+        ?x a ogc:agua:Zi_arpsi ;
+            geo:hasGeometry ?gx .
+        ?y a ogc:nuc ;
+            geo:hasGeometry ?gy .
+        ?g a ogc:administrativeunit ;
+            ogc:nameunit "Madrid" ;
+            ogc:nationallevelname "Municipio" ;
+            geo:hasGeometry ?gg .
+        FILTER(geof:sfContains(?gg, ?gx))
+        FILTER(geof:sfContains(?gy, ?gx))
     }
 
     """

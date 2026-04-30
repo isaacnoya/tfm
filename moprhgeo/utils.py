@@ -57,7 +57,7 @@ def termMapCompatibility(t1, t2, pos=None):
         return True
     if (type(t1) is Reference and type(t2) is rdflib.term.Literal ) or (type(t2) is Reference and type(t1) is rdflib.term.Literal ) :
         return True
-    if i1.startswith(i2) or i2.startswith(i1) and (isinstance(t1, rdflib.term.URIRef) or isinstance(t2, rdflib.term.URIRef)) and (isinstance(t1, Reference) or isinstance(t2, Reference)):
+    if (i1.startswith(i2) or i2.startswith(i1)) and (isinstance(t1, rdflib.term.URIRef) or isinstance(t2, rdflib.term.URIRef)) and (isinstance(t1, Reference) or isinstance(t2, Reference)):
         return True
     #if not isinstance(t1, type(t2)) and not isinstance(t2, type(t1)):
     #    return False

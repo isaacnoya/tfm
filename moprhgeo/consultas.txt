@@ -402,12 +402,9 @@ LIMIT 10
 SELECT ?x ?gx ?y ?gy WHERE {
         ?x a ogc:agua:Zi_arpsi ;
         geo:hasGeometry ?gx .
-    ?y a ogc:railwaystationnode ;
-        geo:hasGeometry ?gy .
     ?g a ogc:administrativeunit ;
         ogc:nameunit "Galicia" ;
         geo:hasGeometry ?gg .
-    FILTER(geof:sfDistance(?gy, ?gx) < 1000) 
     FILTER(geof:sfContains(?gg, ?gx))
 }
 LIMIT 10
@@ -426,13 +423,18 @@ SELECT ?ny ?gy WHERE {
 }
 
 
+/Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/ineAPI/68065_det0_tip_mappings.rml.ttl
 /Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/mapama-features/mappings/agua:estado_masas_aguasub_mapping.ttl
+/Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/mapama-features/mappings/agua:Zi_arpsi_mapping.ttl
 /Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/idee-features/mappings/railwaystationnode_mapping.ttl
-/Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/LinkedOpenDataINE/autogenAPI/mappings/50902/50902_det0_tip_mappings.rml.ttl
 /Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/idee-features/mappings/railwaylink_mapping.ttl
 /Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/idee-features/mappings/standingwater_mapping.ttl
 /Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/ign-features/mappings/administrativeunit_mapping.ttl
+/Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/ign-features/mappings/namedplace_mapping.ttl
+/Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/ign-features/mappings/nuc_mapping.ttl
 /Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/idee-features/mappings/watercourselinksequence_mapping.ttl
 /Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/idee-features/mappings/wetland_mapping.ttl
-/Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/ineAPI/25171_det0_tip_mappings.rml.ttl
 /Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/pygeoapi/mappings/lakes_mapping.ttl
+/Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/idee-features/mappings/damorweir_mapping.ttl
+/Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/STACcopernicus/mappings/clms_ba_global_300m_monthly_v4_cog_mapping.ttl
+/Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/idee-features/mappings/roadlink_mapping.ttl
