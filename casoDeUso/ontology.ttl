@@ -5,6 +5,44 @@
 @prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
 
+<http://geo.linkeddata.es/ontology/conduce> a rdf:Property ;
+    rdfs:label "condicion" ;
+    rdfs:domain ogc:damorweir,
+        ogc:lock ;
+    rdfs:range xsd:string .
+
+<http://geo.linkeddata.es/ontology/es_conectado_con> a rdf:Property ;
+    rdfs:label "otras_cons" ;
+    rdfs:domain <http://www.ogc.org/agua:Zif_riesgo_pob_q500> ;
+    rdfs:range xsd:string .
+
+<http://geo.linkeddata.es/ontology/hydro-ontology.owl#geometría> a rdf:Property ;
+    rdfs:label "geometry" ;
+    rdfs:domain ogc:administrativeunit,
+        ogc:damorweir,
+        ogc:drainagebasin,
+        ogc:falls,
+        ogc:lock,
+        ogc:standingwater,
+        ogc:wetland ;
+    rdfs:range xsd:string .
+
+<http://geo.linkeddata.es/ontology/permite> a rdf:Property ;
+    rdfs:label "nameunit" ;
+    rdfs:domain ogc:administrativeunit ;
+    rdfs:range xsd:string .
+
+<http://geo.linkeddata.es/ontology/transmite> a rdf:Property ;
+    rdfs:label "fuente",
+        "fuented" ;
+    rdfs:domain ogc:damorweir,
+        ogc:drainagebasin,
+        ogc:falls,
+        ogc:lock,
+        ogc:standingwater,
+        ogc:wetland ;
+    rdfs:range xsd:string .
+
 ogc:administrativeunit_collection a geo:FeatureCollection ;
     rdfs:label "AU Unidades administrativas" ;
     geo:hasBoundingBox [ geo:asWKT "<http://www.opengis.net/def/crs/OGC/1.3/CRS84> POLYGON((-19,27,5,44))"^^geo:wktLiteral ] .
@@ -38,12 +76,6 @@ ogc:codnut2 a rdf:Property ;
 ogc:codnut3 a rdf:Property ;
     rdfs:label "codnut3" ;
     rdfs:domain ogc:administrativeunit ;
-    rdfs:range xsd:string .
-
-ogc:condicion a rdf:Property ;
-    rdfs:label "condicion" ;
-    rdfs:domain ogc:damorweir,
-        ogc:lock ;
     rdfs:range xsd:string .
 
 ogc:condiciond a rdf:Property ;
@@ -99,40 +131,9 @@ ogc:fecha_alta a rdf:Property ;
         ogc:wetland ;
     rdfs:range xsd:string .
 
-ogc:fuente a rdf:Property ;
-    rdfs:label "fuente" ;
-    rdfs:domain ogc:damorweir,
-        ogc:drainagebasin,
-        ogc:falls,
-        ogc:lock,
-        ogc:standingwater,
-        ogc:wetland ;
-    rdfs:range xsd:string .
-
-ogc:fuented a rdf:Property ;
-    rdfs:label "fuented" ;
-    rdfs:domain ogc:damorweir,
-        ogc:drainagebasin,
-        ogc:falls,
-        ogc:lock,
-        ogc:standingwater,
-        ogc:wetland ;
-    rdfs:range xsd:string .
-
 ogc:gdb_geomattr_data a rdf:Property ;
     rdfs:label "gdb_geomattr_data" ;
     rdfs:domain <http://www.ogc.org/agua:Zif_riesgo_pob_q500> ;
-    rdfs:range xsd:string .
-
-ogc:geometry a rdf:Property ;
-    rdfs:label "geometry" ;
-    rdfs:domain ogc:administrativeunit,
-        ogc:damorweir,
-        ogc:drainagebasin,
-        ogc:falls,
-        ogc:lock,
-        ogc:standingwater,
-        ogc:wetland ;
     rdfs:range xsd:string .
 
 ogc:gid a rdf:Property ;
@@ -230,11 +231,6 @@ ogc:n_hab_muni a rdf:Property ;
     rdfs:label "n_hab_muni" ;
     rdfs:domain <http://www.ogc.org/agua:Zif_riesgo_pob_q500> ;
     rdfs:range xsd:float .
-
-ogc:nameunit a rdf:Property ;
-    rdfs:label "nameunit" ;
-    rdfs:domain ogc:administrativeunit ;
-    rdfs:range xsd:string .
 
 ogc:nationalcode a rdf:Property ;
     rdfs:label "nationalcode" ;
@@ -398,11 +394,6 @@ ogc:origend a rdf:Property ;
         ogc:standingwater ;
     rdfs:range xsd:string .
 
-ogc:otras_cons a rdf:Property ;
-    rdfs:label "otras_cons" ;
-    rdfs:domain <http://www.ogc.org/agua:Zif_riesgo_pob_q500> ;
-    rdfs:range xsd:string .
-
 ogc:persist a rdf:Property ;
     rdfs:label "persist" ;
     rdfs:domain ogc:falls,
@@ -449,11 +440,6 @@ ogc:superficie a rdf:Property ;
     rdfs:domain <http://www.ogc.org/agua:Zif_riesgo_pob_q500> ;
     rdfs:range xsd:float .
 
-ogc:tipo a rdf:Property ;
-    rdfs:label "tipo" ;
-    rdfs:domain ogc:wetland ;
-    rdfs:range xsd:string .
-
 ogc:tipo_aest a rdf:Property ;
     rdfs:label "tipo_aest" ;
     rdfs:domain ogc:standingwater ;
@@ -487,6 +473,11 @@ ogc:z_coron a rdf:Property ;
     rdfs:label "z_coron" ;
     rdfs:domain ogc:damorweir ;
     rdfs:range xsd:float .
+
+owl:Thing a rdf:Property ;
+    rdfs:label "tipo" ;
+    rdfs:domain ogc:wetland ;
+    rdfs:range xsd:string .
 
 ogc:administrativeunit a owl:class ;
     rdfs:label "AU Unidades administrativas" ;
@@ -522,8 +513,7 @@ ogc:drainagebasin a owl:class ;
 ogc:damorweir a owl:class ;
     rdfs:label "HY-P Presa o represa" ;
     rdfs:comment "Barrera permanente a través de un curso de agua, utilizada para almacenar agua o controlar su flujo." ;
-    rdfs:subClassOf geo:Feature ;
-    owl:sameAs <http://dbpedia.org/ontology/Dam> .
+    rdfs:subClassOf geo:Feature .
 
 ogc:standingwater a owl:class ;
     rdfs:label "HY-P Aguas estancadas" ;

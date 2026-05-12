@@ -15,25 +15,27 @@ from rdflib.plugins.sparql.evalutils import (
 )
 
 from virtual import getStarShapedSubqueries, candidateMappingSelection, materializeVirtualMappingGroup, getMappingsFromBGP, evalVirtualBGP, getMappingGroups, orderTriplesStatic
-from mappings import getMappingsFromTxT
+from mappings import getMappingsFromTxT, getMappingsFromFolder
 from classes import TriplePattern, MappingContext, geoBindings
 from geoFunctions import GEOF_SFCONTAINS, geof_sfContains, GEOF_DISTANCE, geof_distance, GEOF_WITHIN, geof_within, GEOF_INTESECT, geof_intersects, GEOF_OVERLAPS, geof_overlaps, GEOF_CROSSES, geof_crosses
 
 EX = Namespace("http://example.com/")
 
-mappings = getMappingsFromTxT("/Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/moprhgeo/mappings.txt")
-
+#mappings = getMappingsFromTxT("/Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/moprhgeo/mappings.txt")
+mappings = getMappingsFromFolder("/Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/casoDeUso/mappings")
 """
 #TODO:  
     -Mapping Generator:
         Ajustar bien threshold
         Mirar que con propiedades funciones bien
-        Hacerlo mas manual?
+        Hacerlo mas manual? si.
     -PRUEBAS:
+        1. Baseline --> getMappings por star-shaped y materializar
+        2. MorphGEO --> getMappings por star-shaped y materializar + optimizaciones
+        
         -FIXEAR que mi getMappings no pilla bien los parentTripleMaps de GFTS-Madrid
         -Sobre las optimizaciones geoespaciales en los FILTER + bindings.
             -Comparar tiempos con y sin optimizaciones.
-    -Meter medidores de tiempo por etapas
 
 #POSIBLES MEJORAS:
     -Hacer un selectNextSubQuery dinamico o
@@ -42,7 +44,7 @@ mappings = getMappingsFromTxT("/Users/kekojohns/Library/CloudStorage/OneDrive-Pe
     -Paralelizar sub-consultas independientes.
     -El order tiene que ponderar el numero de elementos de la coleccion ?
     -Se podra paralelizar la unificacion?
-
+    -Pushdown de los filter sobre valores literales para que ya ni se metan en el triple store.
 
 
 +++ Query-Specific Pruning of RML Mappings:
@@ -257,6 +259,7 @@ register_custom_function(GEOF_OVERLAPS, geof_overlaps)
 register_custom_function(GEOF_CROSSES, geof_crosses)
 
 import rdflib
+from pathlib import Path
 if __name__ == "__main__":
     g = rdflib.Graph()
 
@@ -264,7 +267,7 @@ if __name__ == "__main__":
     query = """
     PREFIX ogc: <http://www.ogc.org/>
     PREFIX geo: <http://www.opengis.net/ont/geosparql#> 
-    PREFIX ine: <http://lod.ine.es/def/vocabulary/>
+    PREFIX ine: <https://lod.ine.es/def/vocabulary/>
     PREFIX sdmx-measure: <http://purl.org/linked-data/sdmx/2009/measure#>
     PREFIX sdmx-dimension: <http://purl.org/linked-data/sdmx/2009/dimension#>
     PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
@@ -274,18 +277,17 @@ if __name__ == "__main__":
     PREFIX dbo: <http://dbpedia.org/ontology/>
     PREFIX geolinkeddata: <http://geo.linkeddata.es/ontology/> 
 
-    SELECT ?x WHERE {
-        ?x a ogc:agua:Zi_arpsi ;
-            geo:hasGeometry ?gx .
-        ?g a ogc:administrativeunit ;
-            ogc:nameunit "Madrid" ;
-            geo:hasGeometry ?gg .
-        FILTER(geof:sfContains(?gg, ?gx))
+    SELECT ?obsValue ?year WHERE {
+        ?o a qb:Observation ;
+            sdmx-measure:obsValue ?obsValue ;
+            qb:slice ?slice ;
+            sdmx-dimension:year ?year .
     }
-
     """
 
-    qres = g.query(query)
+    #qres = g.query(query)
+    qres = g.query(Path("/Users/kekojohns/Library/CloudStorage/OneDrive-Personal/muia/oeg/tfm/casoDeUso/queries/q04.rq").read_text(encoding="utf-8"))
+
     for r in qres:
         print(r)
         pass

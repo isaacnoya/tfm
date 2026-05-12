@@ -44,22 +44,20 @@ class Collection:
         self.model = model
         self.properties = self._set_properties()
         self.sameAs = self.sameAsF()
-
     def _set_properties(self): 
         r = requests.get(self.url + "/collections/" + self.id + "/queryables" + "?f=json").json()
         ret = JSONPath("$.properties").parse(r)
         ret = ret[0] if ret else {}
         l = []
         for i, v in ret.items():
-            sameAs = self.oe.search(i, "", threshold=0.8) if self.oe else None
-            """
-            if not sameAs and self.search_not_local: # demasiado costoso hacer la busqueda de cada propiedad.
-                sameAs = searchNotLocal(i, "", "property")
-            """
+            sameAs = self.oe.search(i, "", threshold=0.7) if self.oe else None
+            sameAs = sameAs["iri"] if sameAs else None
+            if not sameAs and self.search_not_local and False: # demasiado costoso hacer la busqueda de cada propiedad.
+                sameAs = searchNotLocal(i, "", "property", model=self.model)
             l.append({
                 "title": i,
-                "type": v.get("type", "string"),  # default to string if type is not provided     
-                "sameAs": URIRef(sameAs['iri']) if sameAs else None
+                "type": v.get("type", "string"),   
+                "sameAs": URIRef(sameAs) if sameAs else None
             })
         return l
     
@@ -244,7 +242,7 @@ def generate_mapping(collection, output_mappings_folder, urlBase):
     g_mappings = rdflib.Graph()
     for b in namespaces:
         g_mappings.bind(b, namespaces[b])
-    add_logical_sources(collection.id, collection.url + "/items?f=json&limit=10000", OGC, g_mappings)
+    add_logical_sources(collection.id, collection.url + f"/collections/{collection.id}" + "/items?f=json&limit=10000", OGC, g_mappings)
     triples_map = OGC[collection.id + "TriplesMap"]
     g_mappings.add((triples_map, RDF.type, RML.TriplesMap))
 
@@ -280,7 +278,7 @@ if __name__ == "__main__":
     argparser.add_argument("-n", action="store_true", help="Search in not local ontologies (Wikidata, DBpedia) if no match is found in the local vectorial search. WARNING: can be very slow!")
     argparser.add_argument("-c","--collections", default=None, help="File with urls of the collections to process")
     argparser.add_argument("-r", "--rontologias", default=None, help="Rutas a los archivos .owl")
-    argparser.add_argument("-l", "--llm_model", default="qwen/qwen3-32b", help="LLM model to use for ontology search")
+    argparser.add_argument("-l", "--llm_model", default="openai/gpt-oss-120b", help="LLM model to use for ontology search")
     argparser.add_argument("-v", "--vectorial_model", default="paraphrase-multilingual-MiniLM-L12-v2", help="Sentence Transformer model to use for ontology alignment")
 
     args = argparser.parse_args()

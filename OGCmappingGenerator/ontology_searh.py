@@ -10,25 +10,24 @@ DBO = Namespace("http://dbpedia.org/ontology/")
 
 load_dotenv()
     
-def searchLLM(term, type="class",description="", model=None):  
-    #return None
+def searchLLM(term, type="class", description="", model="llama-3.3-70b-versatile"):  
     api_key = os.getenv("GROQ_API_KEY")
-
     client = Groq(api_key=api_key)
     
-    prompt_sistema = """
-    You are an expert in Semantic Web and Linked Data.
-    Your task is to map user {type} to Wikidata and DBpedia.
-    Respond ONLY in JSON format with the following structure:
-    {
-    "{type}": "...",
-    "wikidata_qid": "Q...",
-    "dbpedia_uri": "http://dbpedia.org/ontology/..."
-    }
-    If you are not sure, set a low confidence value.
-    """
+    # Usamos f-string con doble llave para el esquema JSON
+    prompt_sistema = f"""You are an expert in Semantic Web. 
+    Return a JSON object mapping the {type} to Wikidata and DBpedia.
+    JSON structure:
+    {{
+    "{type}": "{term}",
+    "wikidata_qid": "QID here",
+    "dbpedia_uri": "URI here"
+    }}
+    Respond ONLY with JSON."""
     
-    prompt_usuario = f"Find the equivalent Wikidata ID and DBpedia {type} URI for the {type}: '{term}'" if not description else f"Find the equivalent Wikidata QID and DBpedia {type} URI for the {type}: '{term}' with the following description: '{description}'"
+    prompt_usuario = f"Mapping for {type}: '{term}'"
+    if description:
+        prompt_usuario += f" Description: {description}"
 
     try:
         chat_completion = client.chat.completions.create(
@@ -36,14 +35,13 @@ def searchLLM(term, type="class",description="", model=None):
                 {"role": "system", "content": prompt_sistema},
                 {"role": "user", "content": prompt_usuario}
             ],
-            model=model, # Usamos el modelo grande para mejor precisión
-            temperature=0.1, # Temperatura baja para que sea determinista
-            response_format={"type": "json_object"} # Forzamos salida JSON
+            model=model,
+            temperature=0.1,
+            response_format={"type": "json_object"} 
         )
 
-        # Parsear la respuesta
-        respuesta_json = json.loads(chat_completion.choices[0].message.content)
-        return respuesta_json
+        content = chat_completion.choices[0].message.content
+        return json.loads(content)
 
     except Exception as e:
         print(f"Error con Groq: {e}")
@@ -122,7 +120,8 @@ def llm_propose(ontology, term, type="class", description="", model=None, prefix
         valid_parent_iris = {c["iri"] for c in existing_classes}
         if parent_iri not in valid_parent_iris:
             print(f"Parent IRI proposed by Groq is not in the ontology: {parent_iri}")
-            return None
+            print("Continuing anyway")
+            #return None
         
         # Manual validation by the user
         proposed_iri = respuesta_json.get("iri", "")
